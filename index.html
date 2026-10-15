@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>くろばらの館</title>
+<meta name="description" content="黒い薔薇に閉ざされた館から脱出する、スマホ向け探索ホラーアドベンチャー">
+<meta name="theme-color" content="#07050a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="くろばらの館">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <canvas id="cv" aria-label="ゲーム画面"></canvas>
+
+  <div id="bar" hidden>
+    <button id="btn-menu" aria-label="もちもの">🎒</button>
+    <button id="btn-sound" aria-label="音">🔊</button>
+  </div>
+  <div id="place" hidden></div>
+
+  <!-- 操作 -->
+  <div id="pad" hidden>
+    <div id="stick"><div id="knob"></div></div>
+    <div id="btns">
+      <button id="btn-a" aria-label="しらべる">しらべる</button>
+    </div>
+  </div>
+
+  <!-- メッセージ -->
+  <div id="msg" hidden>
+    <div id="msg-name" hidden></div>
+    <div id="msg-text"></div>
+    <div id="msg-choices" hidden></div>
+    <div id="msg-next">▼</div>
+  </div>
+
+  <!-- タイトル -->
+  <div id="title" class="screen">
+    <div class="title-box">
+      <p class="sub">― 探索ホラーアドベンチャー ―</p>
+      <h1>くろばらの館</h1>
+    </div>
+    <div class="title-menu">
+      <button class="tbtn" id="btn-new">はじめから</button>
+      <button class="tbtn" id="btn-continue" hidden>つづきから</button>
+      <button class="tbtn small" id="btn-help">あそびかた</button>
+      <button class="tbtn small" id="btn-records">きろく</button>
+      <p class="warn">※ びっくりする演出・音があります。音ありがおすすめ</p>
+    </div>
+  </div>
+
+  <!-- 遊び方 -->
+  <div id="help" class="overlay" hidden>
+    <div class="card">
+      <h2>あそびかた</h2>
+      <ol>
+        <li>左下の<b>スティック</b>で歩く</li>
+        <li>気になるものの前で<b>「しらべる」</b></li>
+        <li>拾ったものは🎒<b>もちもの</b>で見られる。使うものは、使う場所でしらべれば自動で使う</li>
+        <li><b>ランプ</b>に火をともすと記録できる。死んでしまったら、最後のランプからやりなおし</li>
+        <li>「なにか」に追いかけられたら、<b>とにかく逃げて</b></li>
+      </ol>
+      <p class="note">パソコンなら 矢印キー／WASD で移動、Z・Enter でしらべる、X でもちもの</p>
+      <button class="cbtn" data-close>とじる</button>
+    </div>
+  </div>
+
+  <!-- 記録 -->
+  <div id="records" class="overlay" hidden>
+    <div class="card">
+      <h2>きろく</h2>
+      <h3>死に方 <span id="death-count"></span></h3>
+      <ul id="death-list"></ul>
+      <h3>エンディング <span id="end-count"></span></h3>
+      <ul id="end-list"></ul>
+      <button class="cbtn" data-close>とじる</button>
+    </div>
+  </div>
+
+  <!-- もちもの -->
+  <div id="inv" class="overlay" hidden>
+    <div class="card">
+      <h2>もちもの</h2>
+      <ul id="inv-list"></ul>
+      <p class="note" id="inv-pages"></p>
+      <div class="row">
+        <button class="cbtn ghost" id="btn-totitle">タイトルへ</button>
+        <button class="cbtn" data-close>とじる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 日記を読む -->
+  <div id="paper" class="overlay" hidden>
+    <div class="paper">
+      <p id="paper-title"></p>
+      <p id="paper-text"></p>
+      <button class="cbtn" data-close>とじる</button>
+    </div>
+  </div>
+
+  <!-- 死亡 -->
+  <div id="dead" class="screen" hidden>
+    <p class="dead-mark">し　ん　だ</p>
+    <p id="dead-name"></p>
+    <p id="dead-count"></p>
+    <div class="title-menu">
+      <button class="tbtn" id="btn-retry">ランプからやりなおす</button>
+      <button class="tbtn small" id="btn-dead-title">タイトルへ</button>
+    </div>
+  </div>
+
+  <!-- エンディング -->
+  <div id="ending" class="screen" hidden>
+    <div id="ending-text"></div>
+    <p id="ending-name"></p>
+    <p id="ending-hint"></p>
+    <div class="title-menu" id="ending-menu" hidden>
+      <button class="tbtn" id="btn-end-title">タイトルへ</button>
+    </div>
+  </div>
+
+  <canvas id="scare" hidden></canvas>
+  <div id="fade"></div>
+</div>
+<script src="game.js"></script>
+</body>
+</html>
