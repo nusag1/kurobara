@@ -18,10 +18,13 @@ function hash(x, y, k = 0) {
 
 // ---------- 保存 ----------
 const SAVE_KEY = 'kurobara-save-v1', META_KEY = 'kurobara-meta-v1';
+let CH = 1;                                   // いま遊んでいる章
+const saveKey = ch => ch === 2 ? 'kurobara-save2-v1' : SAVE_KEY;
 function load(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
 function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 const meta = Object.assign({ deaths: [], endings: [], sound: true }, load(META_KEY) || {});
 const saveMeta = () => store(META_KEY, meta);
+const ch2Open = () => meta.endings.includes('normal') || meta.endings.includes('true');
 
 // ---------- 音（WebAudio で合成） ----------
 const Snd = {
@@ -161,10 +164,20 @@ const Snd = {
     let vol = 0.5;
     if (kind === 'forest') { wind(500, 0.35); osc(41, 'sine', 0.25); vol = 0.6; }
     if (kind === 'house') { osc(55, 'sine', 0.3); osc(58.3, 'sine', 0.25); osc(164.8, 'triangle', 0.025); wind(180, 0.12); }
+    if (kind === 'tower') { osc(46, 'sine', 0.3); osc(69.3, 'sine', 0.12); osc(92.5, 'triangle', 0.015); wind(240, 0.1); }
+    if (kind === 'past') { osc(65.4, 'sine', 0.18); osc(98, 'sine', 0.08); osc(196, 'triangle', 0.012); wind(700, 0.04); vol = 0.4; }
     if (kind === 'chase') { osc(49, 'sawtooth', 0.05); osc(51.9, 'sawtooth', 0.05); osc(73.4, 'sine', 0.25); wind(900, 0.12); vol = 0.6; }
     g.gain.setTargetAtTime(vol, now, 0.8);
     this.amb = { g, nodes };
   },
+  tick(hi) { this.tone(hi ? 2600 : 2100, 0.03, { type: 'square', vol: 0.02 }); this.noise(0.03, { vol: 0.05, freq: 3000, q: 4 }); },
+  bell() { [196, 392, 588, 790].forEach((f, i) => this.tone(f, 4, { type: 'sine', vol: [0.25, 0.1, 0.05, 0.03][i], attack: 0.004 })); },
+  rewind() {
+    this.noise(0.9, { vol: 0.3, freq: 3000, q: 1.5, slide: 0.15, attack: 0.2 });
+    this.tone(880, 0.9, { type: 'triangle', vol: 0.05, slide: 0.3, attack: 0.2 });
+    for (let i = 0; i < 8; i++) this.tone(2400, 0.03, { type: 'square', vol: 0.02, at: i * 0.1 });
+  },
+  gears() { for (let i = 0; i < 6; i++) this.noise(0.12, { vol: 0.25, freq: 400 + i * 60, q: 3, at: i * 0.18 }); this.tone(80, 1.2, { vol: 0.3, attack: 0.2 }); },
   // オルゴール（タイトル・エンディング）
   box: null,
   musicBox(on) {
@@ -475,14 +488,67 @@ function shelfArt(R, hi) {
 }
 const getArt = key => { const a = ARTS[key]; return a ? art(key, a[0], a[1], a[2]) : null; };
 
+// ---------- 昔と今（第二章）：map.past があれば、昔のときはそちらの間取りを使う ----------
+const variantCache = new Map();
+const era = () => (G && G.F.f.past ? 'past' : 'present');
+function mapOf(id) {
+  const m = MAPS[id];
+  if (!m || !m.past || era() !== 'past') return m;
+  let v = variantCache.get(id);
+  if (!v) {
+    v = Object.assign({}, m, m.past, { id: id + '@past', base: m, era: 'past' });
+    v.h = v.rows.length; v.w = v.rows[0].length;
+    v.objs = v.objs || []; v.warps = v.warps || []; v.steps = v.steps || []; v.lights = v.lights || [];
+    variantCache.set(id, v);
+  }
+  return v;
+}
+
 // ---------- タイル ----------
-const WALK = new Set(['.', ':', '=', ',', 'p', 'd', 'S']);
+const WALK = new Set(['.', ':', '=', ',', 'p', 'd', 'S', 'o']);
 function drawTile(g, m, x, y) {
   const ch = tileAt(m, x, y);
   const R = (c, xx, yy, w = 1, h = 1) => { g.fillStyle = c; g.fillRect(x * T + xx, y * T + yy, w, h); };
   const rnd = k => hash(x, y, k);
   const below = tileAt(m, x, y + 1);
+  if (m.style === 'stone' && (ch === '.' || ch === '#' || ch === 'D')) {
+    if (ch === '.') {
+      R('#2c2c34', 0, 0, 16, 16);
+      R('#24242b', 0, 7, 16, 1); R('#24242b', 0, 15, 16, 1);
+      R('#24242b', (y % 2) * 8 + 3, 0, 1, 7); R('#24242b', (y % 2) * 8 + 11, 8, 1, 7);
+      if (rnd(1) < 0.35) R('#36363f', (rnd(2) * 12) | 0, 2 + ((rnd(3) * 10) | 0), 2, 1);
+      if (m.era === 'past') { R('#3a2e2c', 1, 1, 14, 14); R('#463834', 2, 2, 12, 12); R('#3a2e2c', 7, 2, 2, 12); }
+      return;
+    }
+    if (ch === '#' && (WALK.has(below) || below === 'D' || below === 'x' || below === 'w')) {
+      R('#3a3a44', 0, 0, 16, 16); R('#2c2c35', 0, 4, 16, 1); R('#2c2c35', 0, 9, 16, 1);
+      R('#2c2c35', 4, 0, 1, 4); R('#2c2c35', 12, 4, 1, 5); R('#2c2c35', 7, 9, 1, 3);
+      R('#1e1e25', 0, 0, 16, 2); R('#24242c', 0, 12, 16, 4); R('#4a4a56', 0, 12, 16, 1);
+      if (m.era === 'past') { R('#5a4038', 0, 2, 16, 10); for (let i = 0; i < 4; i++) R('#4a3230', i * 4 + 1, 2, 1, 10); }
+      return;
+    }
+    if (ch === 'D') { R('#3a3a44', 0, 0, 16, 16); R('#1e1e25', 0, 0, 16, 2); return; }
+    R('#101016', 0, 0, 16, 16); R('#18181f', 1, 1, 14, 14); return;
+  }
   switch (ch) {
+    case 'x': {
+      R('#08060a', 0, 0, 16, 16);
+      for (let i = 0; i < 5; i++) R(rnd(i) < 0.5 ? '#2a2620' : '#3a342c', (rnd(i + 3) * 12) | 0, (rnd(i + 7) * 12) | 0, 3 + ((rnd(i) * 3) | 0), 2);
+      R('#000', 4, 5, 8, 6);
+      break;
+    }
+    case 'w': {
+      R('#0c1626', 0, 0, 16, 16);
+      for (let i = 0; i < 3; i++) R('#1c3050', (rnd(i) * 12) | 0, (rnd(i + 4) * 14) | 0, 4, 1);
+      if (m.era === 'past') { R('#1e3a5c', 0, 0, 16, 16); R('#4a78a8', (rnd(9) * 10) | 0, 4, 5, 1); R('#4a78a8', (rnd(8) * 10) | 0, 11, 4, 1); }
+      break;
+    }
+    case 'o': {
+      R('#1a1714', 0, 0, 16, 16);
+      R('#2c2620', 1, 1, 14, 14); R('#1a1714', 7, 0, 2, 16); R('#1a1714', 0, 7, 16, 2);
+      R('#5a4a30', 3, 3, 2, 2); R('#5a4a30', 11, 11, 2, 2);
+      break;
+    }
     case '.': {
       R('#38271c', 0, 0, 16, 16);
       for (let r = 0; r < 4; r++) {
@@ -598,6 +664,7 @@ let now = 0;
 const flags = () => (G ? G.F.f : {});
 const has = id => !!G && G.F.items.includes(id);
 const hasPage = n => !!G && G.F.pages.includes(n);
+const curMap = () => mapOf(G.map);
 
 function newState() {
   return { map: 'forest', p: { x: 5, y: 13, dir: 'up' }, F: { items: [], pages: [], f: {}, lit: [] } };
@@ -627,10 +694,12 @@ const DEATHS = [
   ['mirror', '入れかわり', '魔女の鏡'],
   ['caught', 'つかまえた', '追いかけっこ'],
 ];
+const chOf = d => typeof d[3] === 'number' ? d[3] : typeof d[2] === 'number' ? d[2] : 1;
 const ENDINGS = [
   ['normal', 'NORMAL END『またきてね』'],
   ['true', 'TRUE END『朝がきた』'],
 ];
+const ENDING_TEXT = {};
 
 // ---------- マップ ----------
 const MAPS = {
@@ -1183,16 +1252,36 @@ function bfs(m, sx, sy, gx, gy) {
 function updateChase(dt) {
   if (!M || busy || paused || mode !== 'play') return;
   if (M.map !== G.map) return;
+  if (M.era && M.era !== era()) return;     // 時計守は「今」にしかいない
   if (now < M.spawnAt) return;
   if (!M.shown) { M.shown = true; Snd.scare(); vibrate(80); shake(); }
-  const m = MAPS[G.map];
+  const m = mapOf(G.map);
   if (M.moving) {
     M.t += dt / M.speed;
     if (M.t >= 1) { M.moving = false; M.x = M.tx; M.y = M.ty; M.t = 0; }
   }
+  if (G.hidden) {
+    M.hideLeft -= dt;
+    if (M.hideLeft <= 0 && !M.moving) {
+      const done = M.doneFlag;
+      M = null;
+      Snd.setAmb(curMap().amb);
+      if (done) flags()[done] = true;
+      run(async () => { await say('……足音が、遠ざかっていく。'); await say('（しらべる で、外に出る）'); });
+      return;
+    }
+  }
   if (!M.moving) {
     const p = G.p;
-    const gx = p.moving ? p.tx : p.x, gy = p.moving ? p.ty : p.y;
+    let gx = p.moving ? p.tx : p.x, gy = p.moving ? p.ty : p.y;
+    if (G.hidden) {
+      if (!M.wander || (M.x === M.wander[0] && M.y === M.wander[1])) {
+        const cand = [];
+        for (let yy = 0; yy < m.h; yy++) for (let xx = 0; xx < m.w; xx++) if (passable(m, xx, yy)) cand.push([xx, yy]);
+        M.wander = cand[(Math.random() * cand.length) | 0];
+      }
+      [gx, gy] = M.wander;
+    }
     const nxt = bfs(m, M.x, M.y, gx, gy);
     if (nxt) {
       const [nx, ny] = nxt;
@@ -1206,19 +1295,39 @@ function updateChase(dt) {
   const dist = Math.hypot(p.x - mp.x, p.y - mp.y);
   M.beat -= dt;
   if (M.beat <= 0) { Snd.thump(dist < 48 ? 0.7 : 0.45); M.beat = dist < 48 ? 0.42 : dist < 96 ? 0.6 : 0.85; }
-  if (dist < 11) caught();
+  if (dist < 11 && !G.hidden) caught();
 }
 function monsterPos() {
   const t = M.moving ? M.t : 0;
   return { x: (M.x + (M.tx - M.x) * t) * T, y: (M.y + (M.ty - M.y) * t) * T };
 }
-function caught() {
+function caught(found) {
+  const id = found ? 'found' : (M && M.caughtId) || 'caught';
   M = null;
   G.p.moving = false;
+  G.hidden = false; $('hideveil').hidden = true;
+  busy = false;
   run(async () => {
     await scare();
-    await die('caught');
+    await die(id);
   });
+}
+// かくれる（第二章）：追いかけられているときに、たんすなどに入ってやりすごす
+async function hideIn() {
+  if (!M || M.map !== G.map || (M.era && M.era !== era())) return say('せまくて、ほこりっぽい。\n……いざというときは、ここに隠れられそうだ。');
+  if (now >= M.spawnAt) {
+    const pp = pos(G.p), mp = monsterPos();
+    if (Math.hypot(pp.x - mp.x, pp.y - mp.y) < T * 2.2) { M = null; await say('……見られた！'); await scare(); await die('found'); }
+  }
+  Snd.door();
+  G.hidden = true; G.p.moving = false;
+  M.hideLeft = M.hideTime || 6; M.wander = null;
+  $('hideveil').hidden = false;
+}
+function unhide() {
+  if (!G.hidden) return;
+  if (M && M.map === G.map && now >= M.spawnAt && (!M.era || M.era === era())) { caught(true); return; }
+  G.hidden = false; $('hideveil').hidden = true;
 }
 
 // ---------- 移動 ----------
@@ -1235,7 +1344,7 @@ function pos(p) {
 }
 let bumpCool = 0;
 function updatePlayer(dt) {
-  const p = G.p, m = MAPS[G.map];
+  const p = G.p, m = curMap();
   if (p.moving) {
     p.t += dt / STEP;
     p.anim += dt;
@@ -1252,9 +1361,9 @@ function updatePlayer(dt) {
   bumpCool -= dt;
   void m;
 }
-function canMove() { return mode === 'play' && !busy && !paused && !Msg.open; }
+function canMove() { return mode === 'play' && !busy && !paused && !Msg.open && !G.hidden; }
 function tryMove(dir, over) {
-  const p = G.p, m = MAPS[G.map];
+  const p = G.p, m = curMap();
   p.dir = dir;
   const [dx, dy] = DIRS[dir];
   const nx = p.x + dx, ny = p.y + dy;
@@ -1267,7 +1376,7 @@ function tryMove(dir, over) {
   }
 }
 function arrive() {
-  const p = G.p, m = MAPS[G.map];
+  const p = G.p, m = curMap();
   const w = m.warps.find(w => w.x === p.x && w.y === p.y && (!w.when || w.when()));
   if (w) {
     if (w.door) Snd.door(); else Snd.step(false);
@@ -1279,7 +1388,7 @@ function arrive() {
   return false;
 }
 function interact() {
-  const p = G.p, m = MAPS[G.map];
+  const p = G.p, m = curMap();
   const [dx, dy] = DIRS[p.dir];
   const o = objAt(m, p.x + dx, p.y + dy);
   if (o && o.act) run(o.act);
@@ -1292,15 +1401,17 @@ async function warp(to, tx, ty, dir) {
     M.map = to; M.x = M.tx = tx; M.y = M.ty = ty; M.moving = false; M.spawnAt = now + 1.1; M.shown = false;
   } else if (M && M.phase === 1 && to !== 'witch') {
     M.map = to; M.x = M.tx = tx; M.y = M.ty = ty; M.moving = false; M.spawnAt = now + 1.4; M.shown = false;
+  } else if (M && M.follow && !(M.safe || []).includes(to)) {
+    M.map = to; M.x = M.tx = tx; M.y = M.ty = ty; M.moving = false; M.spawnAt = now + (M.lag || 1.2); M.shown = false;
   }
   await fade(false, 220);
-  const m = MAPS[to];
+  const m = mapOf(to);
   if (m.enter) await m.enter();
 }
 function enterMap(id, x, y, dir) {
   G.map = id;
   Object.assign(G.p, { x, y, tx: x, ty: y, dir, moving: false, t: 0, anim: 0 });
-  const m = MAPS[id];
+  const m = mapOf(id);
   if (!M) Snd.setAmb(m.amb);
   showPlace(m.name);
 }
@@ -1358,7 +1469,7 @@ function camera(m, fx, fy) {
 }
 
 function render() {
-  const m = MAPS[G ? G.map : 'forest'];
+  const m = G && mode !== 'title' ? curMap() : MAPS.forest;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, cv.width, cv.height);
@@ -1392,17 +1503,19 @@ function render() {
     if (!img) continue;
     list.push({ y: o.y * T + 16 + (WALK.has(tileAt(m, o.x, o.y)) ? 0 : -16), img, x: o.x * T, dy: o.y * T + 16 - img.height, glint: o.glint });
   }
-  if (pp) {
+  if (pp && !G.hidden) {
     const p = G.p;
     const fr = p.moving ? (Math.floor(p.anim / 0.13) % 2 ? 1 : 2) : 0;
     list.push({ y: pp.y + 16.5, img: girl('riko', p.dir, fr), x: Math.round(pp.x), dy: Math.round(pp.y) - 4 });
   }
   let mp = null;
-  if (M && M.map === m.id && now >= M.spawnAt && mode === 'play') {
+  if (M && G && M.map === G.map && (!M.era || M.era === era()) && now >= M.spawnAt && mode === 'play') {
     mp = monsterPos();
     const fr = M.moving ? (Math.floor(M.frame / 0.14) % 2 ? 1 : 2) : 0;
-    list.push({ y: mp.y + 16.4, img: girl('shadow', M.dir, fr), x: Math.round(mp.x), dy: Math.round(mp.y) - 4, monster: true });
+    const img = M.kind && typeof monsterArt === 'function' ? monsterArt(M.kind, M.dir, fr, now) : girl('shadow', M.dir, fr);
+    list.push({ y: mp.y + 16.4, img, x: Math.round(mp.x), dy: Math.round(mp.y) + 16 - img.height, monster: true });
   }
+  if (G && !title && typeof extraSprites === 'function') for (const e of extraSprites(m, pp)) list.push(e);
   list.sort((a, b) => a.y - b.y);
   for (const it of list) {
     if (it.monster) { ctx.globalAlpha = 0.85 + Math.random() * 0.15; ctx.drawImage(it.img, it.x + (Math.random() < 0.1 ? 1 : 0), it.dy); ctx.globalAlpha = 1; }
@@ -1424,7 +1537,7 @@ function render() {
     gr.addColorStop(0, `rgba(0,0,0,${a})`); gr.addColorStop(0.55, `rgba(0,0,0,${a * 0.6})`); gr.addColorStop(1, 'rgba(0,0,0,0)');
     lg.fillStyle = gr; lg.fillRect(gx - r, gy - r, r * 2, r * 2);
   };
-  if (pp) hole(pp.x + 8, pp.y + 6, m.light * 1.3 + flick);
+  if (pp) hole(pp.x + 8, pp.y + 6, (G.hidden ? 0.45 : 1) * m.light * 1.3 + flick);
   if (title) { hole(m.w * T / 2, 30, 120, 0.6); }
   for (const l of m.lights) hole(l.x * T, l.y * T, l.r + (l.c === 'fire' ? flick * 2 : 0), 0.8);
   for (const o of objsOf(m)) if (o.lantern && G && G.F.lit.includes(o.lantern)) hole(o.x * T + 8, o.y * T + 2, 40 + flick, 0.9);
@@ -1437,7 +1550,7 @@ function render() {
   if (pp) glow(pp.x + 8 - camX, pp.y + 6 - camY, 40, 'rgba(255,170,90,.05)');
   ctx.globalCompositeOperation = 'source-over';
   // 闇の中で光る目
-  if (mp) {
+  if (mp && !M.kind) {
     const ex = mp.x - camX, ey = mp.y - camY - 4;
     const col = M.phase === 2 ? '#ff2a3a' : '#f4f0ff';
     ctx.fillStyle = col;
@@ -1450,6 +1563,17 @@ function render() {
     glow(ex + 8, ey + 7, 7, M.phase === 2 ? 'rgba(255,30,40,.25)' : 'rgba(200,200,255,.18)');
     ctx.globalCompositeOperation = 'source-over';
   }
+  if (mp && M.kind) {
+    ctx.globalCompositeOperation = 'lighter';
+    glow(mp.x + 8 - camX, mp.y - camY + (M.kind === 'keeper' ? -2 : 0), 12, M.kind === 'keeper' ? 'rgba(220,210,170,.22)' : 'rgba(200,190,255,.2)');
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  // 昔のときは、セピアがかった色に
+  if (m.era === 'past') {
+    ctx.globalCompositeOperation = 'soft-light';
+    ctx.fillStyle = 'rgba(200,140,70,.55)'; ctx.fillRect(0, 0, view.w, view.h);
+    ctx.globalCompositeOperation = 'source-over';
+  }
   // 粒子・ビネット
   ctx.globalAlpha = 0.035;
   const gc = grain[(now * 24 | 0) % 3];
@@ -1459,7 +1583,7 @@ function render() {
   const W = cv.width, H = cv.height;
   const vg = ctx.createRadialGradient(W / 2, H * 0.4, Math.min(W, H) * 0.3, W / 2, H * 0.4, Math.max(W, H) * 0.75);
   vg.addColorStop(0, 'rgba(0,0,0,0)');
-  vg.addColorStop(1, M && mode === 'play' ? `rgba(70,0,12,${0.55 + Math.sin(now * 8) * 0.15})` : 'rgba(0,0,0,.7)');
+  vg.addColorStop(1, M && mode === 'play' && (!M.era || M.era === era()) ? `rgba(70,0,12,${0.55 + Math.sin(now * 8) * 0.15})` : G && G.hidden ? 'rgba(0,0,0,.92)' : 'rgba(0,0,0,.7)');
   ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
 }
 function glow(x, y, r, col) {
@@ -1622,7 +1746,7 @@ function closeOverlay(id) {
     overlayDone = null;
     if (d) d();
   }
-  paused = ['help', 'records', 'inv', 'paper'].some(k => !$(k).hidden);
+  paused = ['help', 'records', 'inv', 'paper', 'chapters'].some(k => !$(k).hidden);
 }
 document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => closeOverlay(b.closest('.overlay').id)));
 
@@ -1638,41 +1762,52 @@ function openInventory() {
     li.querySelector('.d').textContent = ITEMS[id].desc;
     ul.appendChild(li);
   }
+  const PG = CH === 2 ? LETTERS : PAGES, pname = CH === 2 ? 'セナの手紙' : '日記の切れはし';
   [...G.F.pages].sort().forEach(n => {
     const li = document.createElement('li');
-    li.innerHTML = `<b>日記の切れはし ${'①②③④'[n - 1]}</b><span class="d">タップで読む</span>`;
+    li.innerHTML = `<b>${pname} ${'①②③④'[n - 1]}</b><span class="d">タップで読む</span>`;
     li.style.cursor = 'pointer';
     li.addEventListener('click', () => {
       closeOverlay('inv');
-      run(() => paper(`日記の切れはし ${'①②③④'[n - 1]}`, PAGES[n]));
+      run(() => paper(`${pname} ${'①②③④'[n - 1]}`, PG[n]));
     });
     ul.appendChild(li);
   });
-  $('inv-pages').textContent = `日記の切れはし ${G.F.pages.length}/4`;
+  $('inv-pages').textContent = `${pname} ${G.F.pages.length}/4`;
   openOverlay('inv');
 }
 
 function openRecords() {
-  const dl = $('death-list'), el = $('end-list');
-  dl.innerHTML = ''; el.innerHTML = '';
-  for (const [id, name, hint] of DEATHS) {
-    const li = document.createElement('li');
-    const got = meta.deaths.includes(id);
-    li.className = got ? '' : 'unk';
-    li.innerHTML = got ? `<b></b><span class="d"></span>` : `？？？<span class="d"></span>`;
-    if (got) li.querySelector('b').textContent = name;
-    li.querySelector('.d').textContent = got ? hint : '';
-    dl.appendChild(li);
+  const body = $('rec-body');
+  body.innerHTML = '';
+  const chs = ch2Open() ? [[1, '第一章　くろばらの館'], [2, '第二章　魔女の時計塔']] : [[1, '']];
+  for (const [ch, title] of chs) {
+    if (title) { const h = document.createElement('p'); h.className = 'rec-ch'; h.textContent = title; body.appendChild(h); }
+    const ds = DEATHS.filter(d => chOf(d) === ch), es = ENDINGS.filter(e => chOf(e) === ch);
+    const h3 = (t, a, b) => { const h = document.createElement('h3'); h.textContent = `${t} ${a}/${b}`; body.appendChild(h); };
+    h3('死に方', ds.filter(d => meta.deaths.includes(d[0])).length, ds.length);
+    let ul = document.createElement('ul');
+    for (const [id, name, hint] of ds) {
+      const li = document.createElement('li');
+      const got = meta.deaths.includes(id);
+      li.className = got ? '' : 'unk';
+      li.innerHTML = got ? `<b></b><span class="d"></span>` : `？？？<span class="d"></span>`;
+      if (got) li.querySelector('b').textContent = name;
+      li.querySelector('.d').textContent = got ? hint : '';
+      ul.appendChild(li);
+    }
+    body.appendChild(ul);
+    h3('エンディング', es.filter(e => meta.endings.includes(e[0])).length, es.length);
+    ul = document.createElement('ul');
+    for (const [id, name] of es) {
+      const li = document.createElement('li');
+      const got = meta.endings.includes(id);
+      li.className = got ? '' : 'unk';
+      li.textContent = got ? name : '？？？';
+      ul.appendChild(li);
+    }
+    body.appendChild(ul);
   }
-  for (const [id, name] of ENDINGS) {
-    const li = document.createElement('li');
-    const got = meta.endings.includes(id);
-    li.className = got ? '' : 'unk';
-    li.textContent = got ? name : '？？？';
-    el.appendChild(li);
-  }
-  $('death-count').textContent = `${meta.deaths.length}/${DEATHS.length}`;
-  $('end-count').textContent = `${meta.endings.length}/${ENDINGS.length}`;
   openOverlay('records');
 }
 
@@ -1683,11 +1818,14 @@ async function die(id) {
   Snd.setAmb(null);
   Snd.death(); vibrate([200, 80, 300]);
   if (!meta.deaths.includes(id)) { meta.deaths.push(id); saveMeta(); }
+  if (G) G.hidden = false;
+  $('hideveil').hidden = true;
   await fade(true, 900, 'red');
   mode = 'dead';
   const d = DEATHS.find(x => x[0] === id);
   $('dead-name').textContent = `『${d[1]}』`;
-  $('dead-count').textContent = `死に方 ${meta.deaths.length}/${DEATHS.length}`;
+  const dl = DEATHS.filter(x => chOf(x) === chOf(d));
+  $('dead-count').textContent = `死に方 ${dl.filter(x => meta.deaths.includes(x[0])).length}/${dl.length}`;
   $('dead').hidden = false;
   setUI();
   await fade(false, 600);
@@ -1701,17 +1839,18 @@ async function ending(kind) {
   await fade(true, 1200, kind === 'true' ? 'white' : '');
   mode = 'ending';
   setUI();
+  const firstClear = (kind === 'normal' || kind === 'true') && !ch2Open();
   if (!meta.endings.includes(kind)) { meta.endings.push(kind); saveMeta(); }
-  store(SAVE_KEY, null);
+  store(saveKey(CH), null);
   const box = $('ending-text');
   box.innerHTML = '';
   $('ending-name').textContent = ''; $('ending-hint').textContent = '';
   $('ending-menu').hidden = true;
-  $('ending').classList.toggle('dawn', kind === 'true');
+  $('ending').classList.toggle('dawn', kind === 'true' || kind === 'c2true');
   $('ending').hidden = false;
   await fade(false, 1200);
   Snd.musicBox(true);
-  const lines = kind === 'true' ? [
+  const lines = ENDING_TEXT[kind] || (kind === 'true' ? [
     '黒い薔薇が、いっせいに散っていく。\n館じゅうの人形が、光のつぶになってほどけていく。',
     '「ごめんね。ありがとう、リコ。\nもう、だれも引きとめないよ」',
     '気がつくと、リコは森の入口に立っていた。\n東の空が、白みはじめている。',
@@ -1723,7 +1862,7 @@ async function ending(kind) {
     '――あの館がどうなったのか、リコは知らない。',
     'ただ、ときどき夢を見る。\n窓の向こうで、小さな女の子が\n手をふっている夢を。',
     '「またきてね」',
-  ];
+  ]);
   for (const l of lines) {
     const p = document.createElement('p');
     p.textContent = l;
@@ -1731,10 +1870,15 @@ async function ending(kind) {
     while (box.children.length > 3) box.removeChild(box.firstChild);
     await sleep(3200);
   }
-  if (kind === 'true') Snd.chime();
+  if (kind === 'true' || kind === 'c2true') Snd.chime();
   $('ending-name').textContent = ENDINGS.find(e => e[0] === kind)[1];
+  const ech = chOf(ENDINGS.find(e => e[0] === kind));
+  const dl = DEATHS.filter(x => chOf(x) === ech), el = ENDINGS.filter(x => chOf(x) === ech);
+  const cnt = `死に方 ${dl.filter(x => meta.deaths.includes(x[0])).length}/${dl.length}　エンディング ${el.filter(x => meta.endings.includes(x[0])).length}/${el.length}`;
   if (kind === 'normal' && !meta.endings.includes('true')) $('ending-hint').textContent = '日記の切れはしを4枚集めて、鏡の前へ行くと……？';
-  else $('ending-hint').textContent = `死に方 ${meta.deaths.length}/${DEATHS.length}　エンディング ${meta.endings.length}/${ENDINGS.length}`;
+  else if (kind === 'c2normal' && !meta.endings.includes('c2true')) $('ending-hint').textContent = 'セナの手紙を4枚集めて、魔女に会うと……？';
+  else $('ending-hint').textContent = cnt;
+  if (ech === 1 && firstClear) $('ending-hint').textContent += '\n\n第二章『魔女の時計塔』が遊べるようになりました';
   $('ending-menu').hidden = false;
   throw DEAD;
 }
@@ -1751,21 +1895,25 @@ async function trueEnd() {
 
 // ---------- 保存・開始 ----------
 function writeSave() {
-  store(SAVE_KEY, { map: G.map, x: G.p.x, y: G.p.y, dir: G.p.dir, F: G.F, tiles: { shelf: !!G.F.f.shelfOpen } });
+  store(saveKey(CH), { ch: CH, map: G.map, x: G.p.x, y: G.p.y, dir: G.p.dir, F: G.F, tiles: { shelf: !!G.F.f.shelfOpen } });
 }
 function applyTiles() {
-  setTile('library', 6, 1, G.F.f.shelfOpen ? 'd' : '#');
+  if (CH === 1) setTile('library', 6, 1, G.F.f.shelfOpen ? 'd' : '#');
 }
 function startPlay() {
   mode = 'play';
   M = null; busy = false; paused = false;
+  if (G) G.hidden = false;
+  $('hideveil').hidden = true; $('chapters').hidden = true;
   hideMsg();
   ['title', 'dead', 'ending'].forEach(id => $(id).hidden = true);
   Snd.musicBox(false);
   setUI();
 }
-async function newGame() {
+async function newGame(ch = 1) {
   Snd.init();
+  CH = ch;
+  if (ch === 2) return newGame2();
   G = newState();
   G.p = { x: 5, y: 13, dir: 'up', tx: 5, ty: 13, moving: false, t: 0, anim: 0 };
   applyTiles();
@@ -1779,10 +1927,11 @@ async function newGame() {
     await say('木のあいだから、うす紫の明かりが見える。');
   });
 }
-async function continueGame() {
-  const s = load(SAVE_KEY);
-  if (!s) return newGame();
+async function continueGame(ch = CH) {
+  const s = load(saveKey(ch));
+  if (!s) return newGame(ch);
   Snd.init();
+  CH = ch;
   G = { map: s.map, p: { x: s.x, y: s.y, dir: s.dir }, F: s.F };
   G.F.f = G.F.f || {};
   applyTiles();
@@ -1795,9 +1944,12 @@ function toTitle() {
   mode = 'title';
   M = null; busy = false; paused = false;
   hideMsg();
-  ['dead', 'ending', 'inv', 'paper'].forEach(id => $(id).hidden = true);
+  ['dead', 'ending', 'inv', 'paper', 'chapters'].forEach(id => $(id).hidden = true);
+  $('hideveil').hidden = true;
+  if (G) G.hidden = false;
   $('title').hidden = false;
-  $('btn-continue').hidden = !load(SAVE_KEY);
+  $('btn-continue').hidden = !load(saveKey(1)) && !load(saveKey(2));
+  $('title-ch2').hidden = !ch2Open();
   Snd.setAmb('forest');
   Snd.musicBox(true);
   setUI();
@@ -1805,6 +1957,8 @@ function toTitle() {
 function setUI() {
   const play = mode === 'play';
   $('pad').hidden = !play; $('bar').hidden = !play;
+  $('btn-era').hidden = !(play && CH === 2 && has('watch'));
+  $('btn-era').classList.toggle('past', era() === 'past');
   if (!play) $('place').hidden = true;
   resize();
 }
@@ -1825,6 +1979,7 @@ function pressA() {
   Snd.init();
   if (mode !== 'play' || paused) return;
   if (Msg.open) return advance();
+  if (G.hidden) { if (!busy) unhide(); return; }
   if (!busy && !G.p.moving) interact();
 }
 
@@ -1867,6 +2022,7 @@ addEventListener('keydown', e => {
     if (!$('paper').hidden) return closeOverlay('paper');
     pressA();
   }
+  if (['c', 'C'].includes(e.key) && mode === 'play' && !$('btn-era').hidden && typeof toggleEra === 'function') { toggleEra(); return; }
   if (['x', 'X', 'Escape'].includes(e.key)) {
     const open = ['paper', 'inv', 'help', 'records'].find(k => !$(k).hidden);
     if (open) closeOverlay(open); else openInventory();
@@ -1878,18 +2034,49 @@ addEventListener('keyup', e => {
 });
 addEventListener('blur', () => { input.keys = []; input.stick = null; syncDir(); });
 
+// 章を選ぶ（第二章は第一章をクリアすると選べる）
+function openChapters(kind) {
+  const box = $('chapter-list');
+  box.innerHTML = '';
+  [[1, '第一章', 'くろばらの館'], [2, '第二章', '魔女の時計塔']].forEach(([ch, no, name]) => {
+    const saved = !!load(saveKey(ch));
+    if (kind === 'continue' && !saved) return;
+    const b = document.createElement('button');
+    b.className = 'tbtn';
+    b.innerHTML = `<small>${no}</small>${name}`;
+    b.addEventListener('click', () => {
+      if (kind === 'continue') { $('chapters').hidden = true; return continueGame(ch); }
+      if (saved && !confirm(`${no}の記録が消えますが、はじめからにしますか？`)) return;
+      $('chapters').hidden = true;
+      store(saveKey(ch), null);
+      newGame(ch);
+    });
+    box.appendChild(b);
+  });
+  $('chapters-title').textContent = kind === 'continue' ? 'つづきから' : 'はじめから';
+  $('chapters').hidden = false;
+}
 $('btn-new').addEventListener('click', () => {
+  Snd.init();
+  if (ch2Open()) return openChapters('new');
   if (load(SAVE_KEY) && !confirm('記録が消えますが、はじめからにしますか？')) return;
   store(SAVE_KEY, null);
-  newGame();
+  newGame(1);
 });
-$('btn-continue').addEventListener('click', continueGame);
+$('btn-continue').addEventListener('click', () => {
+  Snd.init();
+  const a = !!load(saveKey(1)), b = !!load(saveKey(2));
+  if (a && b) return openChapters('continue');
+  continueGame(b ? 2 : 1);
+});
+$('chapters-back').addEventListener('click', () => { $('chapters').hidden = true; });
+$('btn-era').addEventListener('click', () => { if (typeof toggleEra === 'function') toggleEra(); });
 $('btn-help').addEventListener('click', () => { Snd.init(); openOverlay('help'); });
 $('btn-records').addEventListener('click', () => { Snd.init(); openRecords(); });
 $('btn-menu').addEventListener('click', openInventory);
 $('btn-sound').addEventListener('click', () => { Snd.init(); Snd.setOn(!Snd.on); soundBtn(); });
 $('btn-totitle').addEventListener('click', () => { closeOverlay('inv'); toTitle(); });
-$('btn-retry').addEventListener('click', () => { $('dead').hidden = true; continueGame(); });
+$('btn-retry').addEventListener('click', () => { $('dead').hidden = true; continueGame(CH); });
 $('btn-dead-title').addEventListener('click', toTitle);
 $('btn-end-title').addEventListener('click', toTitle);
 $('title').addEventListener('pointerdown', () => { Snd.init(); Snd.setAmb('forest'); Snd.musicBox(true); });
@@ -1905,7 +2092,7 @@ addEventListener('resize', resize);
 
 // ---------- ループ ----------
 let last = performance.now();
-let ambT = 25;
+let ambT = 25, tickT = 1, tickN = 0;
 function loop(t) {
   const dt = Math.min(0.05, (t - last) / 1000);
   last = t;
@@ -1921,6 +2108,7 @@ function loop(t) {
       ambT = 25 + Math.random() * 30;
       if (!M && !busy && MAPS[G.map].amb === 'house') [() => Snd.knock(), () => Snd.giggle(), () => Snd.door()][Math.random() * 3 | 0]();
     }
+    if (CH === 2 && (Snd.ambKind === 'tower' || Snd.ambKind === 'past')) { tickT -= dt; if (tickT <= 0) { tickT = era() === 'past' ? 1 : 1.6; Snd.tick(tickN++ % 2); } }
   }
   if (mode === 'title' || mode === 'ending') Snd.tickBox();
   render();
@@ -1937,5 +2125,6 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
 if (/[?&]debug/.test(location.search)) {
   window.KB = { get G() { return G; }, get M() { return M; }, get mode() { return mode; }, get busy() { return busy; },
     MAPS, warp: (id, x, y, d = 'down') => enterMap(id, x, y, d), give: id => G.F.items.push(id), newGame, run, advance, pressA, input, syncDir,
-    startChase, ending, flags: () => G.F.f, page: n => G.F.pages.push(n), get msg() { return Msg; } };
+    startChase, ending, flags: () => G.F.f, page: n => G.F.pages.push(n), get msg() { return Msg; },
+    get CH() { return CH; }, mapOf, era, hideIn, unhide, interact, get paused() { return paused; }, toTitle, realWarp: warp, get mode2() { return mode; } };
 }

@@ -22,6 +22,7 @@
   <div id="bar" hidden>
     <button id="btn-menu" aria-label="もちもの">🎒</button>
     <button id="btn-sound" aria-label="音">🔊</button>
+    <button id="btn-era" aria-label="懐中時計で時を切りかえる" hidden>⌛</button>
   </div>
   <div id="place" hidden></div>
 
@@ -46,6 +47,7 @@
     <div class="title-box">
       <p class="sub">― 探索ホラーアドベンチャー ―</p>
       <h1>くろばらの館</h1>
+      <p class="sub ch2" id="title-ch2" hidden>第二章『魔女の時計塔』</p>
     </div>
     <div class="title-menu">
       <button class="tbtn" id="btn-new">はじめから</button>
@@ -66,6 +68,7 @@
         <li>拾ったものは🎒<b>もちもの</b>で見られる。使うものは、使う場所でしらべれば自動で使う</li>
         <li><b>ランプ</b>に火をともすと記録できる。死んでしまったら、最後のランプからやりなおし</li>
         <li>「なにか」に追いかけられたら、<b>とにかく逃げて</b></li>
+        <li class="ch2help">（第二章）⌛<b>懐中時計</b>で「昔」と「今」を切りかえられる。追いかけられたら、たんすなどに<b>かくれる</b>ことも</li>
       </ol>
       <p class="note">パソコンなら 矢印キー／WASD で移動、Z・Enter でしらべる、X でもちもの</p>
       <button class="cbtn" data-close>とじる</button>
@@ -76,10 +79,7 @@
   <div id="records" class="overlay" hidden>
     <div class="card">
       <h2>きろく</h2>
-      <h3>死に方 <span id="death-count"></span></h3>
-      <ul id="death-list"></ul>
-      <h3>エンディング <span id="end-count"></span></h3>
-      <ul id="end-list"></ul>
+      <div id="rec-body"></div>
       <button class="cbtn" data-close>とじる</button>
     </div>
   </div>
@@ -127,9 +127,22 @@
     </div>
   </div>
 
+  <!-- 章を選ぶ -->
+  <div id="chapters" class="overlay" hidden>
+    <div class="card">
+      <h2 id="chapters-title">はじめから</h2>
+      <div class="title-menu" id="chapter-list"></div>
+      <button class="cbtn ghost" id="chapters-back">もどる</button>
+    </div>
+  </div>
+
+  <!-- かくれているとき -->
+  <div id="hideveil" hidden><p>……息をひそめている</p><p class="s">（しらべる で外に出る）</p></div>
+
   <canvas id="scare" hidden></canvas>
   <div id="fade"></div>
 </div>
 <script src="game.js"></script>
+<script src="ch2.js"></script>
 </body>
 </html>
