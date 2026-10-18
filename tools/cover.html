@@ -1,0 +1,43 @@
+<!doctype html>
+<!-- itch.io のカバー画像（630×500）。ヘッドレス Chrome で 630×500 のスクリーンショットを撮る -->
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; background: #07050a; }
+  canvas { display: block; width: 630px; height: 500px; image-rendering: pixelated; }
+  h1 { position: absolute; left: 0; right: 0; top: 26px; margin: 0; text-align: center; font: 600 54px "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "Noto Serif JP", serif;
+    letter-spacing: .18em; color: #efe6ea; text-shadow: 0 0 18px rgba(160, 60, 120, .55), 0 2px 0 #000; }
+  p { position: absolute; left: 0; right: 0; top: 98px; margin: 0; text-align: center; font: 15px "Yu Mincho", "YuMincho", serif; letter-spacing: .3em; color: #b8a8c0; }
+</style>
+<canvas id="c" width="126" height="100"></canvas>
+<h1>くろばらの館</h1>
+<p>― 探索ホラーアドベンチャー ―</p>
+<script>
+const g = document.getElementById('c').getContext('2d');
+const R = (c, x, y, w = 1, h = 1) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
+let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+// 夜空
+for (let y = 0; y < 100; y++) R(`rgb(${12 + y * 0.12 | 0},${6 + y * 0.05 | 0},${20 + y * 0.18 | 0})`, 0, y, 126, 1);
+for (let i = 0; i < 40; i++) R(rnd() < .3 ? '#c8c0d8' : '#6a6080', (rnd() * 126) | 0, (rnd() * 40) | 0);
+// 月
+R('#e8e4d8', 101, 27, 9, 9); R('#e8e4d8', 100, 29, 11, 5); R('#cfc8b8', 104, 29, 2, 2); R('#cfc8b8', 107, 32, 1, 1);
+// 館のシルエット
+const S = '#030205';
+R(S, 33, 44, 60, 40); R(S, 28, 52, 70, 32);
+for (let x = 0; x < 30; x++) R(S, 63 - x, 30 + x * 0.5 | 0, x * 2, 1);   // 屋根
+R(S, 40, 30, 6, 14); R(S, 80, 34, 5, 10); R(S, 41, 27, 4, 3);               // 煙突・塔
+R(S, 58, 18, 10, 14); for (let x = 0; x < 7; x++) R(S, 63 - x, 12 + x, x * 2, 1); // 中央の塔
+// 窓のあかり（うす紫）
+[[38, 58], [48, 58], [76, 58], [86, 58], [38, 68], [86, 68], [61, 26]].forEach(([x, y], i) => {
+  R(i === 6 ? '#3a1a40' : '#5a2a68', x, y, 4, 5); R('#8a50a0', x + 1, y + 1, 1, 2); R('#2a1030', x + 2, y, 1, 5); R('#2a1030', x, y + 2, 4, 1);
+});
+R('#1a0c10', 60, 72, 6, 12); R('#c89040', 64, 78, 1, 1);                    // 扉
+// 小道
+for (let y = 84; y < 100; y++) { const w = 6 + (y - 84) * 1.6; R('#140c0c', 63 - w / 2, y, w, 1); }
+// 足もとからのびる黒い蔓
+const vine = (bx, h, ph) => { for (let y = 0; y < h; y++) { const x = bx + Math.round(Math.sin((y + ph) / 3) * 2); R('#000', x, 100 - y, 2, 1); if (y % 5 === 2) R('#000', x + (y % 10 < 5 ? 2 : -2), 100 - y, 2, 1); } };
+[[4, 46, 0], [12, 30, 3], [20, 54, 6], [104, 50, 2], [113, 34, 5], [120, 58, 1], [30, 18, 4], [96, 22, 7]].forEach(a => vine(...a));
+// 小さな黒い薔薇を一輪だけ（目立たせない）
+R('#2a0410', 108, 52, 3, 3); R('#5a0e22', 109, 52, 1, 1);
+// リコ（うしろ姿、赤いリボン）
+R('#000', 62, 88, 3, 2); R('#3a2418', 61, 82, 5, 4); R('#283258', 61, 86, 5, 3); R('#c0303a', 64, 81, 2, 1);
+</script>
