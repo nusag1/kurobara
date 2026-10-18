@@ -211,6 +211,8 @@ button { font-family: inherit; }
 /* ---- 第二章 ---- */
 #btn-era { font-size: 20px; }
 #btn-era.past { background: rgba(120, 80, 30, .55); box-shadow: 0 0 12px rgba(230, 170, 90, .6); }
+#btn-era.stop { background: rgba(70, 100, 150, .6); box-shadow: 0 0 14px rgba(150, 190, 255, .7); }
+#btn-era.cool { opacity: .45; }
 .title-box .sub.ch2 { margin: 10px 0 0; color: #c8b0d8; letter-spacing: .2em; }
 #chapter-list { margin: 6px 0 14px; }
 #chapter-list .tbtn small { display: block; font-size: 12px; letter-spacing: .3em; color: var(--sub); margin-bottom: 2px; }

@@ -19,12 +19,15 @@ function hash(x, y, k = 0) {
 // ---------- 保存 ----------
 const SAVE_KEY = 'kurobara-save-v1', META_KEY = 'kurobara-meta-v1';
 let CH = 1;                                   // いま遊んでいる章
-const saveKey = ch => ch === 2 ? 'kurobara-save2-v1' : SAVE_KEY;
+const saveKey = ch => ch === 3 ? 'kurobara-save3-v1' : ch === 2 ? 'kurobara-save2-v1' : SAVE_KEY;
 function load(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
 function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 const meta = Object.assign({ deaths: [], endings: [], sound: true }, load(META_KEY) || {});
 const saveMeta = () => store(META_KEY, meta);
 const ch2Open = () => meta.endings.includes('normal') || meta.endings.includes('true');
+const ch3Open = () => meta.endings.some(e => /^c2/.test(e));
+const CH_LIST = [[1, '第一章', 'くろばらの館'], [2, '第二章', '魔女の時計塔'], [3, '第三章', 'ソウタの懐中時計']];
+const chOpen = ch => ch === 1 || (ch === 2 && ch2Open()) || (ch === 3 && ch3Open());
 
 // ---------- 音（WebAudio で合成） ----------
 const Snd = {
@@ -691,7 +694,7 @@ const DEATHS = [
   ['doll', 'あたらしいおにんぎょう', '人形のさそい'],
   ['thread', 'からまる糸', 'おもちゃ箱の糸'],
   ['window', 'のぞくもの', '子ども部屋の窓'],
-  ['mirror', '入れかわり', '魔女の鏡'],
+  ['mirror', '鏡の住人', '魔女の鏡'],
   ['caught', 'つかまえた', '追いかけっこ'],
 ];
 const chOf = d => typeof d[3] === 'number' ? d[3] : typeof d[2] === 'number' ? d[2] : 1;
@@ -1189,7 +1192,7 @@ async function witchDesk() {
   flags().mirrorBroken = true;
   await say('パキン――');
   await say('鏡が、割れた。');
-  await say('割れ目の奥から、なにかが這い出てくる！');
+  await say('割れ目の奥で、黒い影が、ゆらりと立ちあがった！');
   await say('……逃げなきゃ！');
   startChase(2, 'witch', 4, 2, 700, 0.235);
 }
@@ -1254,6 +1257,7 @@ function updateChase(dt) {
   if (M.map !== G.map) return;
   if (M.era && M.era !== era()) return;     // 時計守は「今」にしかいない
   if (now < M.spawnAt) return;
+  if (typeof frozen === 'function' && frozen()) return;
   if (!M.shown) { M.shown = true; Snd.scare(); vibrate(80); shake(); }
   const m = mapOf(G.map);
   if (M.moving) {
@@ -1302,7 +1306,7 @@ function monsterPos() {
   return { x: (M.x + (M.tx - M.x) * t) * T, y: (M.y + (M.ty - M.y) * t) * T };
 }
 function caught(found) {
-  const id = found ? 'found' : (M && M.caughtId) || 'caught';
+  const id = found ? (CH === 3 ? 'found3' : 'found') : (M && M.caughtId) || 'caught';
   M = null;
   G.p.moving = false;
   G.hidden = false; $('hideveil').hidden = true;
@@ -1317,7 +1321,7 @@ async function hideIn() {
   if (!M || M.map !== G.map || (M.era && M.era !== era())) return say('せまくて、ほこりっぽい。\n……いざというときは、ここに隠れられそうだ。');
   if (now >= M.spawnAt) {
     const pp = pos(G.p), mp = monsterPos();
-    if (Math.hypot(pp.x - mp.x, pp.y - mp.y) < T * 2.2) { M = null; await say('……見られた！'); await scare(); await die('found'); }
+    if (Math.hypot(pp.x - mp.x, pp.y - mp.y) < T * 2.2) { M = null; await say('……見られた！'); await scare(); await die(CH === 3 ? 'found3' : 'found'); }
   }
   Snd.door();
   G.hidden = true; G.p.moving = false;
@@ -1506,7 +1510,7 @@ function render() {
   if (pp && !G.hidden) {
     const p = G.p;
     const fr = p.moving ? (Math.floor(p.anim / 0.13) % 2 ? 1 : 2) : 0;
-    list.push({ y: pp.y + 16.5, img: girl('riko', p.dir, fr), x: Math.round(pp.x), dy: Math.round(pp.y) - 4 });
+    list.push({ y: pp.y + 16.5, img: typeof playerArt === 'function' ? playerArt(p.dir, fr) : girl('riko', p.dir, fr), x: Math.round(pp.x), dy: Math.round(pp.y) - 4 });
   }
   let mp = null;
   if (M && G && M.map === G.map && (!M.era || M.era === era()) && now >= M.spawnAt && mode === 'play') {
@@ -1762,7 +1766,7 @@ function openInventory() {
     li.querySelector('.d').textContent = ITEMS[id].desc;
     ul.appendChild(li);
   }
-  const PG = CH === 2 ? LETTERS : PAGES, pname = CH === 2 ? 'セナの手紙' : '日記の切れはし';
+  const PG = CH === 3 ? MEMS : CH === 2 ? LETTERS : PAGES, pname = CH === 3 ? 'リコの思い出' : CH === 2 ? 'セナの手紙' : '日記の切れはし';
   [...G.F.pages].sort().forEach(n => {
     const li = document.createElement('li');
     li.innerHTML = `<b>${pname} ${'①②③④'[n - 1]}</b><span class="d">タップで読む</span>`;
@@ -1780,7 +1784,7 @@ function openInventory() {
 function openRecords() {
   const body = $('rec-body');
   body.innerHTML = '';
-  const chs = ch2Open() ? [[1, '第一章　くろばらの館'], [2, '第二章　魔女の時計塔']] : [[1, '']];
+  const chs = ch2Open() ? CH_LIST.filter(([c]) => chOpen(c)).map(([c, no, name]) => [c, `${no}　${name}`]) : [[1, '']];
   for (const [ch, title] of chs) {
     if (title) { const h = document.createElement('p'); h.className = 'rec-ch'; h.textContent = title; body.appendChild(h); }
     const ds = DEATHS.filter(d => chOf(d) === ch), es = ENDINGS.filter(e => chOf(e) === ch);
@@ -1839,14 +1843,14 @@ async function ending(kind) {
   await fade(true, 1200, kind === 'true' ? 'white' : '');
   mode = 'ending';
   setUI();
-  const firstClear = (kind === 'normal' || kind === 'true') && !ch2Open();
+  const firstClear = ((kind === 'normal' || kind === 'true') && !ch2Open()) || (/^c2/.test(kind) && !ch3Open());
   if (!meta.endings.includes(kind)) { meta.endings.push(kind); saveMeta(); }
   store(saveKey(CH), null);
   const box = $('ending-text');
   box.innerHTML = '';
   $('ending-name').textContent = ''; $('ending-hint').textContent = '';
   $('ending-menu').hidden = true;
-  $('ending').classList.toggle('dawn', kind === 'true' || kind === 'c2true');
+  $('ending').classList.toggle('dawn', kind === 'true' || kind === 'c2true' || kind === 'c3true');
   $('ending').hidden = false;
   await fade(false, 1200);
   Snd.musicBox(true);
@@ -1870,15 +1874,17 @@ async function ending(kind) {
     while (box.children.length > 3) box.removeChild(box.firstChild);
     await sleep(3200);
   }
-  if (kind === 'true' || kind === 'c2true') Snd.chime();
+  if (kind === 'true' || kind === 'c2true' || kind === 'c3true') Snd.chime();
   $('ending-name').textContent = ENDINGS.find(e => e[0] === kind)[1];
   const ech = chOf(ENDINGS.find(e => e[0] === kind));
   const dl = DEATHS.filter(x => chOf(x) === ech), el = ENDINGS.filter(x => chOf(x) === ech);
   const cnt = `死に方 ${dl.filter(x => meta.deaths.includes(x[0])).length}/${dl.length}　エンディング ${el.filter(x => meta.endings.includes(x[0])).length}/${el.length}`;
   if (kind === 'normal' && !meta.endings.includes('true')) $('ending-hint').textContent = '日記の切れはしを4枚集めて、鏡の前へ行くと……？';
   else if (kind === 'c2normal' && !meta.endings.includes('c2true')) $('ending-hint').textContent = 'セナの手紙を4枚集めて、魔女に会うと……？';
+  else if (kind === 'c3normal' && !meta.endings.includes('c3true')) $('ending-hint').textContent = 'リコの思い出を4つ集めて、時を止めた中で会うと……？';
   else $('ending-hint').textContent = cnt;
   if (ech === 1 && firstClear) $('ending-hint').textContent += '\n\n第二章『魔女の時計塔』が遊べるようになりました';
+  if (ech === 2 && firstClear) $('ending-hint').textContent += '\n\n第三章『ソウタの懐中時計』が遊べるようになりました';
   $('ending-menu').hidden = false;
   throw DEAD;
 }
@@ -1908,12 +1914,15 @@ function startPlay() {
   hideMsg();
   ['title', 'dead', 'ending'].forEach(id => $(id).hidden = true);
   Snd.musicBox(false);
+  if (typeof S3 !== 'undefined') { S3.stopUntil = 0; S3.coolUntil = 0; S3.wasFrozen = false; }
+  $('cv').style.filter = '';
   setUI();
 }
 async function newGame(ch = 1) {
   Snd.init();
   CH = ch;
   if (ch === 2) return newGame2();
+  if (ch === 3) return newGame3();
   G = newState();
   G.p = { x: 5, y: 13, dir: 'up', tx: 5, ty: 13, moving: false, t: 0, anim: 0 };
   applyTiles();
@@ -1948,8 +1957,10 @@ function toTitle() {
   $('hideveil').hidden = true;
   if (G) G.hidden = false;
   $('title').hidden = false;
-  $('btn-continue').hidden = !load(saveKey(1)) && !load(saveKey(2));
+  $('btn-continue').hidden = ![1, 2, 3].some(c => load(saveKey(c)));
   $('title-ch2').hidden = !ch2Open();
+  $('title-ch3').hidden = !ch3Open();
+  $('cv').style.filter = '';
   Snd.setAmb('forest');
   Snd.musicBox(true);
   setUI();
@@ -1957,7 +1968,9 @@ function toTitle() {
 function setUI() {
   const play = mode === 'play';
   $('pad').hidden = !play; $('bar').hidden = !play;
-  $('btn-era').hidden = !(play && CH === 2 && has('watch'));
+  $('btn-era').hidden = !(play && ((CH === 2 && has('watch')) || (CH === 3 && has('watch3'))));
+  $('btn-era').textContent = CH === 3 ? '⏱' : '⌛';
+  $('btn-era').setAttribute('aria-label', CH === 3 ? '懐中時計で時を止める' : '懐中時計で時を切りかえる');
   $('btn-era').classList.toggle('past', era() === 'past');
   if (!play) $('place').hidden = true;
   resize();
@@ -2022,7 +2035,7 @@ addEventListener('keydown', e => {
     if (!$('paper').hidden) return closeOverlay('paper');
     pressA();
   }
-  if (['c', 'C'].includes(e.key) && mode === 'play' && !$('btn-era').hidden && typeof toggleEra === 'function') { toggleEra(); return; }
+  if (['c', 'C'].includes(e.key) && mode === 'play' && !$('btn-era').hidden) { eraAction(); return; }
   if (['x', 'X', 'Escape'].includes(e.key)) {
     const open = ['paper', 'inv', 'help', 'records'].find(k => !$(k).hidden);
     if (open) closeOverlay(open); else openInventory();
@@ -2038,9 +2051,10 @@ addEventListener('blur', () => { input.keys = []; input.stick = null; syncDir();
 function openChapters(kind) {
   const box = $('chapter-list');
   box.innerHTML = '';
-  [[1, '第一章', 'くろばらの館'], [2, '第二章', '魔女の時計塔']].forEach(([ch, no, name]) => {
+  CH_LIST.forEach(([ch, no, name]) => {
     const saved = !!load(saveKey(ch));
     if (kind === 'continue' && !saved) return;
+    if (kind !== 'continue' && !chOpen(ch)) return;
     const b = document.createElement('button');
     b.className = 'tbtn';
     b.innerHTML = `<small>${no}</small>${name}`;
@@ -2065,12 +2079,13 @@ $('btn-new').addEventListener('click', () => {
 });
 $('btn-continue').addEventListener('click', () => {
   Snd.init();
-  const a = !!load(saveKey(1)), b = !!load(saveKey(2));
-  if (a && b) return openChapters('continue');
-  continueGame(b ? 2 : 1);
+  const saved = [1, 2, 3].filter(c => load(saveKey(c)));
+  if (saved.length > 1) return openChapters('continue');
+  continueGame(saved[0] || 1);
 });
 $('chapters-back').addEventListener('click', () => { $('chapters').hidden = true; });
-$('btn-era').addEventListener('click', () => { if (typeof toggleEra === 'function') toggleEra(); });
+function eraAction() { if (CH === 3) { if (typeof stopTime === 'function') stopTime(); } else if (typeof toggleEra === 'function') toggleEra(); }
+$('btn-era').addEventListener('click', eraAction);
 $('btn-help').addEventListener('click', () => { Snd.init(); openOverlay('help'); });
 $('btn-records').addEventListener('click', () => { Snd.init(); openRecords(); });
 $('btn-menu').addEventListener('click', openInventory);
@@ -2108,7 +2123,8 @@ function loop(t) {
       ambT = 25 + Math.random() * 30;
       if (!M && !busy && MAPS[G.map].amb === 'house') [() => Snd.knock(), () => Snd.giggle(), () => Snd.door()][Math.random() * 3 | 0]();
     }
-    if (CH === 2 && (Snd.ambKind === 'tower' || Snd.ambKind === 'past')) { tickT -= dt; if (tickT <= 0) { tickT = era() === 'past' ? 1 : 1.6; Snd.tick(tickN++ % 2); } }
+    if (typeof tick3 === 'function') tick3(dt);
+    if ((CH === 2 || (CH === 3 && !frozen())) && (Snd.ambKind === 'tower' || Snd.ambKind === 'past')) { tickT -= dt; if (tickT <= 0) { tickT = era() === 'past' ? 1 : 1.6; Snd.tick(tickN++ % 2); } }
   }
   if (mode === 'title' || mode === 'ending') Snd.tickBox();
   render();
