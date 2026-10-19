@@ -124,6 +124,7 @@ button { font-family: inherit; }
   animation: breathe 5s ease-in-out infinite;
 }
 .title-menu { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
+.title-menu .credit { font-size: 12px; letter-spacing: .25em; color: var(--sub); margin: 4px 0 0; opacity: .8; }
 .tbtn {
   width: 240px; max-width: 100%; padding: 14px 10px; font-size: 18px; letter-spacing: .2em;
   color: var(--fg); background: rgba(20,10,16,.75); border: 1px solid #5a3040; border-radius: 4px;

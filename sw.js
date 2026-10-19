@@ -1,6 +1,6 @@
 // オフラインで遊べるようにファイルをキャッシュする
 // ファイルを更新したら VERSION を上げること
-const VERSION = 'kurobara-v4';
+const VERSION = 'kurobara-v5';
 const FILES = [
   './',
   'index.html',
