@@ -16,7 +16,7 @@ sw = "if ('serviceWorker' in navigator && location.protocol === 'https:') {\n  n
 assert sw in game
 game = game.replace(sw, '// itch.io 版：オフライン機能（Service Worker）は使わない')
 
-files = {'index.html': html, 'game.js': game, 'ch2.js': rd('ch2.js'), 'ch3.js': rd('ch3.js'), 'omake.js': rd('omake.js'), 'style.css': rd('style.css')}
+files = {'index.html': html, 'game.js': game, 'ch2.js': rd('ch2.js'), 'ch3.js': rd('ch3.js'), 'ch4.js': rd('ch4.js'), 'omake.js': rd('omake.js'), 'style.css': rd('style.css')}
 dest = os.path.join(OUT, 'kurobara_itch.zip')
 with zipfile.ZipFile(dest, 'w', zipfile.ZIP_DEFLATED) as z:
     for name, text in files.items():

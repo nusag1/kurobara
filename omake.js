@@ -1,6 +1,6 @@
 'use strict';
 // くろばらの館 おまけ（三つの章の TRUE END をすべて見ると解放）
-//   エピローグ『白い薔薇の朝』：館のあとの原っぱで、鏡の中のミナにもう一度会う（CH = 4 として遊ぶ。記録はしない）
+//   エピローグ『白い薔薇の朝』：館のあとの原っぱで、鏡の中のミナにもう一度会う（CH = EP_CH として遊ぶ。記録はしない）
 //   設定資料室：人物・部屋の作者メモ・死に方とエンディングの図鑑（作者のひとこと）・クリアタイム・章えらび
 //   タイムアタックの計測そのものは game.js（meta.run／meta.best）
 
@@ -42,7 +42,7 @@ Object.assign(ARTS, {
 Object.assign(ITEMS, {
   blackRose: { name: '黒い薔薇', desc: 'あの館の前でひろった、小さな一輪。何年たっても、枯れずにいる。' },
 });
-ENDINGS.push(['epilogue', 'EPILOGUE『白い薔薇の朝』', 4]);
+ENDINGS.push(['epilogue', 'EPILOGUE『白い薔薇の朝』', EP_CH]);
 Object.assign(ENDING_TEXT, {
   epilogue: [
     '鏡の表面が、水のようにゆれて、\nもとの、ひびだらけの古い鏡にもどった。',
@@ -52,7 +52,7 @@ Object.assign(ENDING_TEXT, {
     '――鏡の向こうにも、朝は来るのだろうか。',
   ],
 });
-ENDING_HINT4 = '鏡の向こうの館のお話は……いつか、また。';
+ENDING_HINT4 = '鏡の向こうの館のお話は……第四章『鏡の向こうの館』で。';
 
 // ---------- エピローグのマップ ----------
 const epMirrorArt = () => (flags().epHouse ? 'mirrorHouse' : flags().epMina ? 'mirrorMina' : 'mirror');
@@ -187,7 +187,7 @@ async function epMirror() {
 }
 
 // ---------- はじまり ----------
-async function newGame4() {
+async function newGameEp() {
   G = { map: 'ep_garden', p: { x: 5, y: 12, dir: 'up' }, F: { items: ['blackRose'], pages: [], f: {}, lit: [] } };
   G.p = { x: 5, y: 12, dir: 'up', tx: 5, ty: 12, moving: false, t: 0, anim: 0 };
   $('archive').hidden = true;
@@ -209,6 +209,7 @@ const PROFILES = [
     ['第一章・第二章の主人公。森で迷って、黒い薔薇の館に閉じこめられた女の子。こわがりだけど、だれかの名前を呼ぶ勇気がある。'],
     ['赤いリボンは、おかあさんに結んでもらったもの。'],
     ['ある時間では、弟のかわりに自分の時間をさしだし、二代目の時計守になった。', ['c2another', 'c3normal', 'c3true', 'c3another']],
+    ['第四章では、ひびだらけの鏡をくぐって、鏡の向こうの館へ、ミナをむかえにいく。', ['c4normal', 'c4true', 'c4another']],
   ] },
   { name: 'ソウタ', art: () => boy('down', 0), lines: [
     ['リコの弟。帽子をよくなくす。第二章では、黒い花びらを追いかけて森に消えてしまう。', ['c2normal', 'c2true', 'c2another']],
@@ -218,8 +219,13 @@ const PROFILES = [
   { name: 'ミナ', art: () => girl('mina', 'down', 0), lines: [
     ['館に引っこしてきて、ひとりぼっちだった女の子。「ずっと、ひとりにならないように」と魔女に願った。'],
     ['名前を呼ばれて願いがとけたあとも、鏡の中から、リコたちを見守っている。', ['true', 'c2normal', 'c2true', 'c2another']],
-    ['どうして鏡の中にいられるのかは……まだ、ひみつ。'],
+    ['どうして鏡の中にいられるのかは……まだ、ひみつ。', null, ['c4true']],
     ['鏡の向こうには、もうひとつの館がある……らしい。', ['epilogue']],
+    ['ほんとうの名前は「ナミ」。「ミナ」は、鏡の中のおともだちにつけた名前だった。魔女に時間をわたしたとき、自分の名前をなくし、おともだちの名前だけを覚えていた。', ['c4true']],
+  ] },
+  { name: '鏡のミナ', art: () => flippedGirl('mina', 'down', 0), lines: [
+    ['鏡の館にすむ、リボンがはんたいがわの女の子。かくれんぼでは、鬼のほうが好き。', ['c4normal', 'c4true', 'c4another']],
+    ['ナミが鏡の中の自分につけた名前が「ミナ」。ナミが名前をなくしてから、ずっとその名前をあずかっていた。', ['c4true']],
   ] },
   { name: '魔女リラ', art: () => monsterArt('lila', 'down', 0, 0), lines: [
     ['森のおくの時計塔の魔女。白い薔薇が好き。', ['c2normal', 'c2true', 'c2another']],
@@ -276,6 +282,18 @@ const ROOM_NOTES = {
     ['歯車の間', '転がる歯車は三列。止めて、歩いて、また止めて。'],
     ['鐘の間', '赤いリボンだけは、七年たっても色あせていません。'],
   ],
+  4: [
+    ['白い薔薇の原っぱ', 'エピローグと同じ場所の、夜。鏡だけが、明かりを映しています。'],
+    ['鏡の庭', '池の水面も、りっぱな鏡です。のぞきこみすぎに注意。'],
+    ['玄関ホール', '第一章のホールを、左右はんたいにしました。あいことばは、鏡のミナの口ぐせです。'],
+    ['書斎', '「おなじ場所」は、鏡の向こうでは、はんたいがわ。'],
+    ['廊下', 'おくれる鏡は、作っていて自分でもこわくなりました。'],
+    ['台所', 'お皿の名前は、第一章の台所の一枚と、ちゃんとつながっています。'],
+    ['衣装部屋', '手鏡を取ったとたん、鏡のリコは「まねっこ」をやめます。'],
+    ['二階の廊下', 'エピローグでカーテンを閉めたのは、この窓でした。'],
+    ['おかあさんの部屋', 'ハンカチのししゅうは、赤い糸。リコのリボンと同じ色です。'],
+    ['こども部屋', '第一章の「魔女の部屋」の、ほんとうの姿です。'],
+  ],
 };
 
 // 図鑑：作者のひとこと
@@ -309,6 +327,16 @@ const DEATH_NOTES = {
   teeth: '歯車の上は、止めてから歩きましょう。',
   bell: '鐘の綱は、ひっぱりたくなる長さにしてあります。わざとです。',
   lila3: '七年たっても、魔女の足は速いままでした。',
+  c4pond: '水面のリコは、ちょっとさびしがりやです。',
+  c4thorn: 'くぐる前に、むこうがわをよく見てから。',
+  c4candle: '「おなじ場所」は、鏡の向こうでは、はんたいがわ。',
+  c4spell: 'うらがえしの字は、手鏡で読みましょう。',
+  c4lag: 'まばたきの回数まで、まねしてくれる鏡でした。',
+  c4tea: 'お茶は、ちゃんとおいしいらしいです。',
+  c4shadow: 'まねっこをやめた影は、足が速いです。',
+  c4needle: 'ミシンは、影をぬうための道具ではありません。',
+  c4name: 'その名前も、だれかの、たいせつな名前です。',
+  c4mina: '鏡のミナは、鬼ごっこも得意です。',
 };
 const ENDING_NOTES = {
   normal: 'いちばん最初に作ったエンディング。「またきてね」は、ちょっとだけ本気です。',
@@ -320,6 +348,9 @@ const ENDING_NOTES = {
   c3true: '「ただいま」を書くために、ここまで来ました。',
   c3another: '時計はめぐる。……作者として、ちょっと胸が痛いです。',
   epilogue: 'ミナのお話は、まだ終わっていません。',
+  c4normal: 'カーテンのすきまの目は、ずっと、こっちを見ています。',
+  c4true: '「ミナ」が「ナミ」の鏡うつしだと気づいた人、えらい。',
+  c4another: 'リコは、やっぱり、こういう子でした。',
 };
 
 const ARC_TABS = [['people', '人物'], ['rooms', '部屋'], ['book', '図鑑'], ['time', 'タイム'], ['jump', '章えらび']];
@@ -353,7 +384,8 @@ function showArcTab(id) {
 function arcPeople(body) {
   body.appendChild(el('p', 'lead', '見たエンディングがふえると、書いてあることもふえます。'));
   for (const p of PROFILES) {
-    const lines = p.lines.filter(([, need]) => seenAny(need));
+    // hide：その行を、見たら消えるエンディング（ひみつが明かされたら、ひみつの行は引っこめる）
+    const lines = p.lines.filter(([, need, hide]) => seenAny(need) && !(hide && hide.some(e => meta.endings.includes(e))));
     if (!lines.length) continue;
     const box = el('div', 'prof');
     const img = p.art(), c = el('canvas', 'face');
@@ -383,10 +415,10 @@ function arcRooms(body) {
 }
 
 function arcBook(body) {
-  const chs = [...CH_LIST, [4, 'おまけ', 'エピローグ']];
+  const chs = [...CH_LIST.filter(([c]) => chOpen(c)), [EP_CH, 'おまけ', 'エピローグ']];
   for (const [ch, no, name] of chs) {
     const ds = DEATHS.filter(d => chOf(d) === ch), es = ENDINGS.filter(e => chOf(e) === ch);
-    if (ch === 4 && !meta.endings.includes('epilogue')) continue;
+    if (ch === EP_CH && !meta.endings.includes('epilogue')) continue;
     body.appendChild(el('p', 'rec-ch', `${no}　${name}`));
     const list = (title, items, got, notes) => {
       if (!items.length) return;
@@ -438,7 +470,7 @@ function arcJump(body) {
   }
   const ep = el('button', 'tbtn epi');
   ep.append(el('small', '', 'エピローグ'), '白い薔薇の朝');
-  ep.addEventListener('click', () => { closeOverlay('archive'); newGame(4); });
+  ep.addEventListener('click', () => { closeOverlay('archive'); newGame(EP_CH); });
   box.appendChild(ep);
   body.appendChild(box);
 }

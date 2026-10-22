@@ -247,3 +247,6 @@ button { font-family: inherit; }
 #arc-body .title-menu { margin: 8px 0 0; }
 #arc-body .tbtn small { display: block; font-size: 12px; letter-spacing: .3em; color: var(--sub); margin-bottom: 2px; }
 #arc-body .tbtn.epi { border-color: #a08050; color: #f4e4c4; }
+
+/* ---- 第四章：鏡文字（鏡の館の字は、手鏡を手に入れるまで左右反転で出す） ---- */
+#msg-text.mirtext, #paper-text.mirtext, #place.mirtext { transform: scaleX(-1); }

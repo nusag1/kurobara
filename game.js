@@ -19,7 +19,8 @@ function hash(x, y, k = 0) {
 // ---------- 保存 ----------
 const SAVE_KEY = 'kurobara-save-v1', META_KEY = 'kurobara-meta-v1';
 let CH = 1;                                   // いま遊んでいる章
-const saveKey = ch => ch === 4 ? 'kurobara-save4-v1' : ch === 3 ? 'kurobara-save3-v1' : ch === 2 ? 'kurobara-save2-v1' : SAVE_KEY;
+const EP_CH = 9;                              // おまけのエピローグ（記録はしない）
+const saveKey = ch => ch === EP_CH ? 'kurobara-saveep-v1' : ch === 4 ? 'kurobara-save4-v1' : ch === 3 ? 'kurobara-save3-v1' : ch === 2 ? 'kurobara-save2-v1' : SAVE_KEY;
 function load(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
 function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 // run＝いま遊んでいる回の経過秒（章ごと。はじめからで 0）、best＝章ごとの最速クリア { t, end }
@@ -27,8 +28,10 @@ const meta = Object.assign({ deaths: [], endings: [], sound: true, run: {}, best
 const saveMeta = () => store(META_KEY, meta);
 const ch2Open = () => meta.endings.includes('normal') || meta.endings.includes('true');
 const ch3Open = () => meta.endings.some(e => /^c2/.test(e));
-const CH_LIST = [[1, '第一章', 'くろばらの館'], [2, '第二章', '魔女の時計塔'], [3, '第三章', 'ソウタの懐中時計']];
-const chOpen = ch => ch === 1 || (ch === 2 && ch2Open()) || (ch === 3 && ch3Open());
+const ch4Open = () => meta.endings.some(e => /^c3/.test(e));
+const CH_LIST = [[1, '第一章', 'くろばらの館'], [2, '第二章', '魔女の時計塔'], [3, '第三章', 'ソウタの懐中時計'], [4, '第四章', '鏡の向こうの館']];
+const PLAY_CHS = [1, 2, 3, 4];
+const chOpen = ch => ch === 1 || (ch === 2 && ch2Open()) || (ch === 3 && ch3Open()) || (ch === 4 && ch4Open());
 // おまけ（エピローグ・設定資料室）は、三つの章の TRUE END をすべて見ると解放
 const TRUE_IDS = ['true', 'c2true', 'c3true'];
 const trueCount = () => TRUE_IDS.filter(e => meta.endings.includes(e)).length;
@@ -180,6 +183,7 @@ const Snd = {
     if (kind === 'house') { osc(55, 'sine', 0.3); osc(58.3, 'sine', 0.25); osc(164.8, 'triangle', 0.025); wind(180, 0.12); }
     if (kind === 'tower') { osc(46, 'sine', 0.3); osc(69.3, 'sine', 0.12); osc(92.5, 'triangle', 0.015); wind(240, 0.1); }
     if (kind === 'past') { osc(65.4, 'sine', 0.18); osc(98, 'sine', 0.08); osc(196, 'triangle', 0.012); wind(700, 0.04); vol = 0.4; }
+    if (kind === 'mirror') { osc(196, 'sine', 0.06); osc(293.7, 'sine', 0.035); osc(392.4, 'triangle', 0.008); wind(1100, 0.04); vol = 0.4; }
     if (kind === 'dawn') { wind(1400, 0.05); osc(130.8, 'sine', 0.05); osc(196, 'sine', 0.03); osc(329.6, 'triangle', 0.006); vol = 0.35; }
     if (kind === 'chase') { osc(49, 'sawtooth', 0.05); osc(51.9, 'sawtooth', 0.05); osc(73.4, 'sine', 0.25); wind(900, 0.12); vol = 0.6; }
     g.gain.setTargetAtTime(vol, now, 0.8);
@@ -511,10 +515,16 @@ function shelfArt(R, hi) {
 const getArt = key => { const a = ARTS[key]; return a ? art(key, a[0], a[1], a[2]) : null; };
 
 // ---------- 昔と今（第二章）：map.past があれば、昔のときはそちらの間取りを使う ----------
+//   第四章：map.mirror があれば、鏡の向こうにいるときは左右はんたいの間取り（mirrorVariant は ch4.js）
 const variantCache = new Map();
-const era = () => (G && G.F.f.past ? 'past' : 'present');
+const era = () => (G && G.F.f.past ? 'past' : G && G.F.f.mir ? 'mirror' : 'present');
 function mapOf(id) {
   const m = MAPS[id];
+  if (m && m.mirror && era() === 'mirror' && typeof mirrorVariant === 'function') {
+    let v = variantCache.get(id + '@mir');
+    if (!v) { v = mirrorVariant(m); variantCache.set(id + '@mir', v); }
+    return v;
+  }
   if (!m || !m.past || era() !== 'past') return m;
   let v = variantCache.get(id);
   if (!v) {
@@ -1527,7 +1537,7 @@ function render() {
     } else if (o.lantern && G && G.F.lit.includes(o.lantern)) img = getArt('lanternLit');
     else img = getArt(key);
     if (!img) continue;
-    list.push({ y: o.y * T + 16 + (WALK.has(tileAt(m, o.x, o.y)) ? 0 : -16), img, x: o.x * T, dy: o.y * T + 16 - img.height, glint: o.glint });
+    list.push({ y: o.y * T + 16 + (WALK.has(tileAt(m, o.x, o.y)) ? 0 : -16), img, x: o.x * T, dy: o.y * T + 16 - img.height, glint: o.glint, flip: m.mirrored && !o.noflip });
   }
   if (pp && !G.hidden) {
     const p = G.p;
@@ -1545,6 +1555,7 @@ function render() {
   list.sort((a, b) => a.y - b.y);
   for (const it of list) {
     if (it.monster) { ctx.globalAlpha = 0.85 + Math.random() * 0.15; ctx.drawImage(it.img, it.x + (Math.random() < 0.1 ? 1 : 0), it.dy); ctx.globalAlpha = 1; }
+    else if (it.flip) { ctx.save(); ctx.translate(it.x + it.img.width, 0); ctx.scale(-1, 1); ctx.drawImage(it.img, 0, it.dy); ctx.restore(); }
     else ctx.drawImage(it.img, it.x, it.dy);
     if (it.glint && (now % 1.6) < 0.35) { ctx.fillStyle = '#fff8e0'; ctx.fillRect(it.x + 10, it.dy + 8, 1, 1); ctx.fillRect(it.x + 9, it.dy + 9, 3, 0.5); }
   }
@@ -1788,18 +1799,19 @@ function openInventory() {
     li.querySelector('.d').textContent = ITEMS[id].desc;
     ul.appendChild(li);
   }
-  const PG = CH === 3 ? MEMS : CH === 2 ? LETTERS : PAGES, pname = CH === 3 ? 'リコの思い出' : CH === 2 ? 'セナの手紙' : '日記の切れはし';
-  if (CH !== 4) [...G.F.pages].sort().forEach(n => {
+  const PG = CH === 4 ? DIARY4 : CH === 3 ? MEMS : CH === 2 ? LETTERS : PAGES;
+  const pname = CH === 4 ? '古い日記' : CH === 3 ? 'リコの思い出' : CH === 2 ? 'セナの手紙' : '日記の切れはし';
+  if (CH !== EP_CH) [...G.F.pages].sort().forEach(n => {
     const li = document.createElement('li');
     li.innerHTML = `<b>${pname} ${'①②③④'[n - 1]}</b><span class="d">タップで読む</span>`;
     li.style.cursor = 'pointer';
     li.addEventListener('click', () => {
       closeOverlay('inv');
-      run(() => paper(`${pname} ${'①②③④'[n - 1]}`, PG[n]));
+      run(() => CH === 4 ? readDiary4(n) : paper(`${pname} ${'①②③④'[n - 1]}`, PG[n]));
     });
     ul.appendChild(li);
   });
-  $('inv-pages').textContent = CH === 4 ? '' : `${pname} ${G.F.pages.length}/4`;
+  $('inv-pages').textContent = CH === EP_CH ? '' : `${pname} ${G.F.pages.length}/4`;
   openOverlay('inv');
 }
 
@@ -1862,17 +1874,17 @@ async function ending(kind) {
   M = null;
   hideMsg();
   Snd.setAmb(null);
-  const dawn = kind === 'true' || kind === 'c2true' || kind === 'c3true' || kind === 'epilogue';
+  const dawn = kind === 'true' || kind === 'c2true' || kind === 'c3true' || kind === 'c4true' || kind === 'epilogue';
   await fade(true, 1200, kind === 'true' || kind === 'epilogue' ? 'white' : '');
   mode = 'ending';
   setUI();
-  const firstClear = ((kind === 'normal' || kind === 'true') && !ch2Open()) || (/^c2/.test(kind) && !ch3Open());
+  const firstClear = ((kind === 'normal' || kind === 'true') && !ch2Open()) || (/^c2/.test(kind) && !ch3Open()) || (/^c3/.test(kind) && !ch4Open());
   const omakeBefore = omakeOpen();
   if (!meta.endings.includes(kind)) meta.endings.push(kind);
   // タイムアタック：はじめから遊んだ回だけ、クリアタイムを記録する
   const ech = chOf(ENDINGS.find(e => e[0] === kind));
   let timeLine = '';
-  if (ech <= 3 && typeof meta.run[ech] === 'number') {
+  if (PLAY_CHS.includes(ech) && typeof meta.run[ech] === 'number') {
     const t = meta.run[ech], b = meta.best[ech];
     delete meta.run[ech];
     const isBest = !b || t < b.t;
@@ -1917,14 +1929,16 @@ async function ending(kind) {
   if (kind === 'normal' && !meta.endings.includes('true')) $('ending-hint').textContent = '日記の切れはしを4枚集めて、鏡の前へ行くと……？';
   else if (kind === 'c2normal' && !meta.endings.includes('c2true')) $('ending-hint').textContent = 'セナの手紙を4枚集めて、魔女に会うと……？';
   else if (kind === 'c3normal' && !meta.endings.includes('c3true')) $('ending-hint').textContent = 'リコの思い出を4つ集めて、時を止めた中で会うと……？';
+  else if (kind === 'c4normal' && !meta.endings.includes('c4true')) $('ending-hint').textContent = '古い日記を4枚集めて、あの子の名前がわかったら……？';
   else $('ending-hint').textContent = cnt;
-  if (ech === 4) $('ending-hint').textContent = ENDING_HINT4;
+  if (ech === EP_CH) $('ending-hint').textContent = ENDING_HINT4;
   if (timeLine) $('ending-hint').textContent = timeLine + '\n' + $('ending-hint').textContent;
   if (ech === 1 && firstClear) $('ending-hint').textContent += '\n\n第二章『魔女の時計塔』が遊べるようになりました';
   if (ech === 2 && firstClear) $('ending-hint').textContent += '\n\n第三章『ソウタの懐中時計』が遊べるようになりました';
+  if (ech === 3 && firstClear) $('ending-hint').textContent += '\n\n第四章『鏡の向こうの館』が遊べるようになりました';
   if (!omakeBefore && omakeOpen()) {
     $('ending-hint').textContent += '\n\nすべての TRUE END を見ました。\nタイトルに「おまけ」が増えました';
-    $('btn-end-epi').hidden = typeof newGame4 !== 'function';
+    $('btn-end-epi').hidden = typeof newGameEp !== 'function';
   }
   $('ending-menu').hidden = false;
   throw DEAD;
@@ -1962,7 +1976,8 @@ function startPlay() {
 async function newGame(ch = 1) {
   Snd.init();
   CH = ch;
-  if (ch <= 3) { meta.run[ch] = 0; saveMeta(); }
+  if (PLAY_CHS.includes(ch)) { meta.run[ch] = 0; saveMeta(); }
+  if (ch === EP_CH) return newGameEp();
   if (ch === 4) return newGame4();
   if (ch === 2) return newGame2();
   if (ch === 3) return newGame3();
@@ -2001,9 +2016,10 @@ function toTitle() {
   $('hideveil').hidden = true;
   if (G) G.hidden = false;
   $('title').hidden = false;
-  $('btn-continue').hidden = ![1, 2, 3].some(c => load(saveKey(c)));
+  $('btn-continue').hidden = !PLAY_CHS.some(c => load(saveKey(c)));
   $('title-ch2').hidden = !ch2Open();
   $('title-ch3').hidden = !ch3Open();
+  $('title-ch4').hidden = !ch4Open();
   // おまけまでの進みぐあい（TRUE END の数）
   $('title-prog').textContent = omakeOpen() ? '✦ TRUE END 3/3 ✦' : `TRUE END ${trueCount()}/3`;
   $('title-prog').classList.toggle('done', omakeOpen());
@@ -2129,7 +2145,7 @@ $('btn-new').addEventListener('click', () => {
 });
 $('btn-continue').addEventListener('click', () => {
   Snd.init();
-  const saved = [1, 2, 3].filter(c => load(saveKey(c)));
+  const saved = PLAY_CHS.filter(c => load(saveKey(c)));
   if (saved.length > 1) return openChapters('continue');
   continueGame(saved[0] || 1);
 });
@@ -2144,7 +2160,7 @@ $('btn-totitle').addEventListener('click', () => { closeOverlay('inv'); toTitle(
 $('btn-retry').addEventListener('click', () => { $('dead').hidden = true; continueGame(CH); });
 $('btn-dead-title').addEventListener('click', toTitle);
 $('btn-end-title').addEventListener('click', toTitle);
-$('btn-end-epi').addEventListener('click', () => newGame(4));
+$('btn-end-epi').addEventListener('click', () => newGame(EP_CH));
 $('btn-omake').addEventListener('click', () => { Snd.init(); openArchive(); });
 $('title').addEventListener('pointerdown', () => { Snd.init(); Snd.setAmb('forest'); Snd.musicBox(true); });
 function soundBtn() { $('btn-sound').textContent = Snd.on ? '🔊' : '🔇'; $('btn-sound').classList.toggle('off', !Snd.on); }
@@ -2177,7 +2193,7 @@ function loop(t) {
     }
     if (typeof tick3 === 'function') tick3(dt);
     // タイムアタック（メニューを開いているあいだは止まる）。5秒ごとに書きこむ
-    if (CH <= 3 && typeof meta.run[CH] === 'number') { meta.run[CH] += dt; runSaveT -= dt; if (runSaveT <= 0) { runSaveT = 5; saveMeta(); } }
+    if (PLAY_CHS.includes(CH) && typeof meta.run[CH] === 'number') { meta.run[CH] += dt; runSaveT -= dt; if (runSaveT <= 0) { runSaveT = 5; saveMeta(); } }
     if ((CH === 2 || (CH === 3 && !frozen())) && (Snd.ambKind === 'tower' || Snd.ambKind === 'past')) { tickT -= dt; if (tickT <= 0) { tickT = era() === 'past' ? 1 : 1.6; Snd.tick(tickN++ % 2); } }
   }
   if (mode === 'title' || mode === 'ending') Snd.tickBox();
@@ -2196,5 +2212,5 @@ if (/[?&]debug/.test(location.search)) {
   window.KB = { get G() { return G; }, get M() { return M; }, get mode() { return mode; }, get busy() { return busy; },
     MAPS, warp: (id, x, y, d = 'down') => enterMap(id, x, y, d), give: id => G.F.items.push(id), newGame, run, advance, pressA, input, syncDir,
     startChase, ending, die, flags: () => G.F.f, page: n => G.F.pages.push(n), get msg() { return Msg; },
-    get CH() { return CH; }, mapOf, era, hideIn, unhide, interact, get paused() { return paused; }, toTitle, realWarp: warp, get mode2() { return mode; } };
+    get CH() { return CH; }, mapOf, era, objsOf, passable, curMap, tileAt, get meta() { return meta; }, interactAt: () => interact(), hideIn, unhide, interact, get paused() { return paused; }, toTitle, realWarp: warp, get mode2() { return mode; } };
 }
