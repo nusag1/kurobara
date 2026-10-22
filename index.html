@@ -49,10 +49,12 @@
       <h1>くろばらの館</h1>
       <p class="sub ch2" id="title-ch2" hidden>第二章『魔女の時計塔』</p>
       <p class="sub ch2" id="title-ch3" hidden>第三章『ソウタの懐中時計』</p>
+      <p class="sub prog" id="title-prog"></p>
     </div>
     <div class="title-menu">
       <button class="tbtn" id="btn-new">はじめから</button>
       <button class="tbtn" id="btn-continue" hidden>つづきから</button>
+      <button class="tbtn small omake" id="btn-omake" hidden>おまけ</button>
       <button class="tbtn small" id="btn-help">あそびかた</button>
       <button class="tbtn small" id="btn-records">きろく</button>
       <p class="warn">※ びっくりする演出・音があります。音ありがおすすめ</p>
@@ -126,6 +128,7 @@
     <p id="ending-name"></p>
     <p id="ending-hint"></p>
     <div class="title-menu" id="ending-menu" hidden>
+      <button class="tbtn" id="btn-end-epi" hidden>エピローグへ</button>
       <button class="tbtn" id="btn-end-title">タイトルへ</button>
     </div>
   </div>
@@ -139,6 +142,16 @@
     </div>
   </div>
 
+  <!-- おまけ：設定資料室 -->
+  <div id="archive" class="overlay" hidden>
+    <div class="card">
+      <h2>設定資料室</h2>
+      <div class="tabs" id="arc-tabs" role="tablist"></div>
+      <div id="arc-body"></div>
+      <button class="cbtn" data-close>とじる</button>
+    </div>
+  </div>
+
   <!-- かくれているとき -->
   <div id="hideveil" hidden><p>……息をひそめている</p><p class="s">（しらべる で外に出る）</p></div>
 
@@ -148,5 +161,6 @@
 <script src="game.js"></script>
 <script src="ch2.js"></script>
 <script src="ch3.js"></script>
+<script src="omake.js"></script>
 </body>
 </html>

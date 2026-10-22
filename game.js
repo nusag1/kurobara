@@ -19,15 +19,26 @@ function hash(x, y, k = 0) {
 // ---------- 保存 ----------
 const SAVE_KEY = 'kurobara-save-v1', META_KEY = 'kurobara-meta-v1';
 let CH = 1;                                   // いま遊んでいる章
-const saveKey = ch => ch === 3 ? 'kurobara-save3-v1' : ch === 2 ? 'kurobara-save2-v1' : SAVE_KEY;
+const saveKey = ch => ch === 4 ? 'kurobara-save4-v1' : ch === 3 ? 'kurobara-save3-v1' : ch === 2 ? 'kurobara-save2-v1' : SAVE_KEY;
 function load(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
 function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
-const meta = Object.assign({ deaths: [], endings: [], sound: true }, load(META_KEY) || {});
+// run＝いま遊んでいる回の経過秒（章ごと。はじめからで 0）、best＝章ごとの最速クリア { t, end }
+const meta = Object.assign({ deaths: [], endings: [], sound: true, run: {}, best: {} }, load(META_KEY) || {});
 const saveMeta = () => store(META_KEY, meta);
 const ch2Open = () => meta.endings.includes('normal') || meta.endings.includes('true');
 const ch3Open = () => meta.endings.some(e => /^c2/.test(e));
 const CH_LIST = [[1, '第一章', 'くろばらの館'], [2, '第二章', '魔女の時計塔'], [3, '第三章', 'ソウタの懐中時計']];
 const chOpen = ch => ch === 1 || (ch === 2 && ch2Open()) || (ch === 3 && ch3Open());
+// おまけ（エピローグ・設定資料室）は、三つの章の TRUE END をすべて見ると解放
+const TRUE_IDS = ['true', 'c2true', 'c3true'];
+const trueCount = () => TRUE_IDS.filter(e => meta.endings.includes(e)).length;
+const omakeOpen = () => trueCount() === TRUE_IDS.length;
+const chCleared = ch => meta.endings.some(e => ENDINGS.some(x => x[0] === e && chOf(x) === ch));
+function fmtTime(sec) {
+  const t = Math.floor(sec), h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, s = t % 60;
+  const p2 = n => String(n).padStart(2, '0');
+  return h ? `${h}:${p2(m)}:${p2(s)}` : `${m}:${p2(s)}`;
+}
 
 // ---------- 音（WebAudio で合成） ----------
 const Snd = {
@@ -169,6 +180,7 @@ const Snd = {
     if (kind === 'house') { osc(55, 'sine', 0.3); osc(58.3, 'sine', 0.25); osc(164.8, 'triangle', 0.025); wind(180, 0.12); }
     if (kind === 'tower') { osc(46, 'sine', 0.3); osc(69.3, 'sine', 0.12); osc(92.5, 'triangle', 0.015); wind(240, 0.1); }
     if (kind === 'past') { osc(65.4, 'sine', 0.18); osc(98, 'sine', 0.08); osc(196, 'triangle', 0.012); wind(700, 0.04); vol = 0.4; }
+    if (kind === 'dawn') { wind(1400, 0.05); osc(130.8, 'sine', 0.05); osc(196, 'sine', 0.03); osc(329.6, 'triangle', 0.006); vol = 0.35; }
     if (kind === 'chase') { osc(49, 'sawtooth', 0.05); osc(51.9, 'sawtooth', 0.05); osc(73.4, 'sine', 0.25); wind(900, 0.12); vol = 0.6; }
     g.gain.setTargetAtTime(vol, now, 0.8);
     this.amb = { g, nodes };
@@ -710,6 +722,7 @@ const ENDINGS = [
   ['true', 'TRUE END『朝がきた』'],
 ];
 const ENDING_TEXT = {};
+let ENDING_HINT4 = '';         // おまけのエピローグを見おえたときの一言（omake.js）
 
 // ---------- マップ ----------
 const MAPS = {
@@ -1581,10 +1594,10 @@ function render() {
     glow(mp.x + 8 - camX, mp.y - camY + (M.kind === 'keeper' ? -2 : 0), 12, M.kind === 'keeper' ? 'rgba(220,210,170,.22)' : 'rgba(200,190,255,.2)');
     ctx.globalCompositeOperation = 'source-over';
   }
-  // 昔のときは、セピアがかった色に
-  if (m.era === 'past') {
+  // 昔のときは、セピアがかった色に（m.tint があれば、その色に）
+  if (m.era === 'past' || m.tint) {
     ctx.globalCompositeOperation = 'soft-light';
-    ctx.fillStyle = 'rgba(200,140,70,.55)'; ctx.fillRect(0, 0, view.w, view.h);
+    ctx.fillStyle = m.tint || 'rgba(200,140,70,.55)'; ctx.fillRect(0, 0, view.w, view.h);
     ctx.globalCompositeOperation = 'source-over';
   }
   // 粒子・ビネット
@@ -1759,7 +1772,7 @@ function closeOverlay(id) {
     overlayDone = null;
     if (d) d();
   }
-  paused = ['help', 'records', 'inv', 'paper', 'chapters'].some(k => !$(k).hidden);
+  paused = ['help', 'records', 'inv', 'paper', 'chapters', 'archive'].some(k => !$(k).hidden);
 }
 document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => closeOverlay(b.closest('.overlay').id)));
 
@@ -1776,7 +1789,7 @@ function openInventory() {
     ul.appendChild(li);
   }
   const PG = CH === 3 ? MEMS : CH === 2 ? LETTERS : PAGES, pname = CH === 3 ? 'リコの思い出' : CH === 2 ? 'セナの手紙' : '日記の切れはし';
-  [...G.F.pages].sort().forEach(n => {
+  if (CH !== 4) [...G.F.pages].sort().forEach(n => {
     const li = document.createElement('li');
     li.innerHTML = `<b>${pname} ${'①②③④'[n - 1]}</b><span class="d">タップで読む</span>`;
     li.style.cursor = 'pointer';
@@ -1786,7 +1799,7 @@ function openInventory() {
     });
     ul.appendChild(li);
   });
-  $('inv-pages').textContent = `${pname} ${G.F.pages.length}/4`;
+  $('inv-pages').textContent = CH === 4 ? '' : `${pname} ${G.F.pages.length}/4`;
   openOverlay('inv');
 }
 
@@ -1849,17 +1862,31 @@ async function ending(kind) {
   M = null;
   hideMsg();
   Snd.setAmb(null);
-  await fade(true, 1200, kind === 'true' ? 'white' : '');
+  const dawn = kind === 'true' || kind === 'c2true' || kind === 'c3true' || kind === 'epilogue';
+  await fade(true, 1200, kind === 'true' || kind === 'epilogue' ? 'white' : '');
   mode = 'ending';
   setUI();
   const firstClear = ((kind === 'normal' || kind === 'true') && !ch2Open()) || (/^c2/.test(kind) && !ch3Open());
-  if (!meta.endings.includes(kind)) { meta.endings.push(kind); saveMeta(); }
+  const omakeBefore = omakeOpen();
+  if (!meta.endings.includes(kind)) meta.endings.push(kind);
+  // タイムアタック：はじめから遊んだ回だけ、クリアタイムを記録する
+  const ech = chOf(ENDINGS.find(e => e[0] === kind));
+  let timeLine = '';
+  if (ech <= 3 && typeof meta.run[ech] === 'number') {
+    const t = meta.run[ech], b = meta.best[ech];
+    delete meta.run[ech];
+    const isBest = !b || t < b.t;
+    if (isBest) meta.best[ech] = { t, end: kind };
+    timeLine = `クリアタイム ${fmtTime(t)}` + (isBest ? (b ? '　ベスト更新！' : '') : `（ベスト ${fmtTime(b.t)}）`);
+  }
+  saveMeta();
   store(saveKey(CH), null);
   const box = $('ending-text');
   box.innerHTML = '';
   $('ending-name').textContent = ''; $('ending-hint').textContent = '';
   $('ending-menu').hidden = true;
-  $('ending').classList.toggle('dawn', kind === 'true' || kind === 'c2true' || kind === 'c3true');
+  $('ending').classList.toggle('dawn', dawn);
+  $('btn-end-epi').hidden = true;
   $('ending').hidden = false;
   await fade(false, 1200);
   Snd.musicBox(true);
@@ -1883,17 +1910,22 @@ async function ending(kind) {
     while (box.children.length > 3) box.removeChild(box.firstChild);
     await sleep(3200);
   }
-  if (kind === 'true' || kind === 'c2true' || kind === 'c3true') Snd.chime();
+  if (dawn) Snd.chime();
   $('ending-name').textContent = ENDINGS.find(e => e[0] === kind)[1];
-  const ech = chOf(ENDINGS.find(e => e[0] === kind));
   const dl = DEATHS.filter(x => chOf(x) === ech), el = ENDINGS.filter(x => chOf(x) === ech);
   const cnt = `死に方 ${dl.filter(x => meta.deaths.includes(x[0])).length}/${dl.length}　エンディング ${el.filter(x => meta.endings.includes(x[0])).length}/${el.length}`;
   if (kind === 'normal' && !meta.endings.includes('true')) $('ending-hint').textContent = '日記の切れはしを4枚集めて、鏡の前へ行くと……？';
   else if (kind === 'c2normal' && !meta.endings.includes('c2true')) $('ending-hint').textContent = 'セナの手紙を4枚集めて、魔女に会うと……？';
   else if (kind === 'c3normal' && !meta.endings.includes('c3true')) $('ending-hint').textContent = 'リコの思い出を4つ集めて、時を止めた中で会うと……？';
   else $('ending-hint').textContent = cnt;
+  if (ech === 4) $('ending-hint').textContent = ENDING_HINT4;
+  if (timeLine) $('ending-hint').textContent = timeLine + '\n' + $('ending-hint').textContent;
   if (ech === 1 && firstClear) $('ending-hint').textContent += '\n\n第二章『魔女の時計塔』が遊べるようになりました';
   if (ech === 2 && firstClear) $('ending-hint').textContent += '\n\n第三章『ソウタの懐中時計』が遊べるようになりました';
+  if (!omakeBefore && omakeOpen()) {
+    $('ending-hint').textContent += '\n\nすべての TRUE END を見ました。\nタイトルに「おまけ」が増えました';
+    $('btn-end-epi').hidden = typeof newGame4 !== 'function';
+  }
   $('ending-menu').hidden = false;
   throw DEAD;
 }
@@ -1930,6 +1962,8 @@ function startPlay() {
 async function newGame(ch = 1) {
   Snd.init();
   CH = ch;
+  if (ch <= 3) { meta.run[ch] = 0; saveMeta(); }
+  if (ch === 4) return newGame4();
   if (ch === 2) return newGame2();
   if (ch === 3) return newGame3();
   G = newState();
@@ -1962,13 +1996,18 @@ function toTitle() {
   mode = 'title';
   M = null; busy = false; paused = false;
   hideMsg();
-  ['dead', 'ending', 'inv', 'paper', 'chapters'].forEach(id => $(id).hidden = true);
+  ['dead', 'ending', 'inv', 'paper', 'chapters', 'archive'].forEach(id => $(id).hidden = true);
+  saveMeta();
   $('hideveil').hidden = true;
   if (G) G.hidden = false;
   $('title').hidden = false;
   $('btn-continue').hidden = ![1, 2, 3].some(c => load(saveKey(c)));
   $('title-ch2').hidden = !ch2Open();
   $('title-ch3').hidden = !ch3Open();
+  // おまけまでの進みぐあい（TRUE END の数）
+  $('title-prog').textContent = omakeOpen() ? '✦ TRUE END 3/3 ✦' : `TRUE END ${trueCount()}/3`;
+  $('title-prog').classList.toggle('done', omakeOpen());
+  $('btn-omake').hidden = !omakeOpen() || typeof openArchive !== 'function';
   $('cv').style.filter = '';
   Snd.setAmb('forest');
   Snd.musicBox(true);
@@ -2040,13 +2079,15 @@ addEventListener('keydown', e => {
   }
   if (e.repeat) return;
   if (['z', 'Z', 'Enter', ' '].includes(e.key)) {
+    // タイトルや資料室では、選んでいるボタンを Enter／スペースでそのまま押せるように
+    if (mode !== 'play' && e.key !== 'z' && e.key !== 'Z' && document.activeElement && document.activeElement.tagName === 'BUTTON') return;
     e.preventDefault();
     if (!$('paper').hidden) return closeOverlay('paper');
     pressA();
   }
   if (['c', 'C'].includes(e.key) && mode === 'play' && !$('btn-era').hidden) { eraAction(); return; }
   if (['x', 'X', 'Escape'].includes(e.key)) {
-    const open = ['paper', 'inv', 'help', 'records'].find(k => !$(k).hidden);
+    const open = ['paper', 'inv', 'help', 'records', 'archive'].find(k => !$(k).hidden);
     if (open) closeOverlay(open); else openInventory();
   }
 });
@@ -2103,6 +2144,8 @@ $('btn-totitle').addEventListener('click', () => { closeOverlay('inv'); toTitle(
 $('btn-retry').addEventListener('click', () => { $('dead').hidden = true; continueGame(CH); });
 $('btn-dead-title').addEventListener('click', toTitle);
 $('btn-end-title').addEventListener('click', toTitle);
+$('btn-end-epi').addEventListener('click', () => newGame(4));
+$('btn-omake').addEventListener('click', () => { Snd.init(); openArchive(); });
 $('title').addEventListener('pointerdown', () => { Snd.init(); Snd.setAmb('forest'); Snd.musicBox(true); });
 function soundBtn() { $('btn-sound').textContent = Snd.on ? '🔊' : '🔇'; $('btn-sound').classList.toggle('off', !Snd.on); }
 soundBtn();
@@ -2116,7 +2159,7 @@ addEventListener('resize', resize);
 
 // ---------- ループ ----------
 let last = performance.now();
-let ambT = 25, tickT = 1, tickN = 0;
+let ambT = 25, tickT = 1, tickN = 0, runSaveT = 5;
 function loop(t) {
   const dt = Math.min(0.05, (t - last) / 1000);
   last = t;
@@ -2133,6 +2176,8 @@ function loop(t) {
       if (!M && !busy && MAPS[G.map].amb === 'house') [() => Snd.knock(), () => Snd.giggle(), () => Snd.door()][Math.random() * 3 | 0]();
     }
     if (typeof tick3 === 'function') tick3(dt);
+    // タイムアタック（メニューを開いているあいだは止まる）。5秒ごとに書きこむ
+    if (CH <= 3 && typeof meta.run[CH] === 'number') { meta.run[CH] += dt; runSaveT -= dt; if (runSaveT <= 0) { runSaveT = 5; saveMeta(); } }
     if ((CH === 2 || (CH === 3 && !frozen())) && (Snd.ambKind === 'tower' || Snd.ambKind === 'past')) { tickT -= dt; if (tickT <= 0) { tickT = era() === 'past' ? 1 : 1.6; Snd.tick(tickN++ % 2); } }
   }
   if (mode === 'title' || mode === 'ending') Snd.tickBox();
@@ -2150,6 +2195,6 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
 if (/[?&]debug/.test(location.search)) {
   window.KB = { get G() { return G; }, get M() { return M; }, get mode() { return mode; }, get busy() { return busy; },
     MAPS, warp: (id, x, y, d = 'down') => enterMap(id, x, y, d), give: id => G.F.items.push(id), newGame, run, advance, pressA, input, syncDir,
-    startChase, ending, flags: () => G.F.f, page: n => G.F.pages.push(n), get msg() { return Msg; },
+    startChase, ending, die, flags: () => G.F.f, page: n => G.F.pages.push(n), get msg() { return Msg; },
     get CH() { return CH; }, mapOf, era, hideIn, unhide, interact, get paused() { return paused; }, toTitle, realWarp: warp, get mode2() { return mode; } };
 }

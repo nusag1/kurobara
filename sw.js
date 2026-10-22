@@ -1,6 +1,6 @@
 // オフラインで遊べるようにファイルをキャッシュする
 // ファイルを更新したら VERSION を上げること
-const VERSION = 'kurobara-v5';
+const VERSION = 'kurobara-v6';
 const FILES = [
   './',
   'index.html',
@@ -8,6 +8,7 @@ const FILES = [
   'game.js',
   'ch2.js',
   'ch3.js',
+  'omake.js',
   'manifest.webmanifest',
   'icons/icon-192.png',
   'icons/icon-512.png',

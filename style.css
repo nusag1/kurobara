@@ -223,3 +223,27 @@ button { font-family: inherit; }
 #hideveil .s { font-size: 12px; color: #8a7a84; letter-spacing: .1em; }
 #ending-hint { white-space: pre-wrap; }
 #fade.sepia { background: #3a2410; }
+
+/* ---- おまけ（設定資料室・エピローグ） ---- */
+.title-box .sub.prog { margin: 14px 0 0; font-size: 12px; letter-spacing: .25em; color: #6e6070; }
+.title-box .sub.prog.done { color: #f0d8a8; text-shadow: 0 0 10px rgba(240,200,140,.55); }
+.tbtn.omake { color: #f4e4c4; border-color: #a08050; box-shadow: 0 0 12px rgba(240,200,140,.25); }
+.tabs { display: flex; gap: 4px; margin: 0 0 10px; }
+.tabs button {
+  flex: 1; min-width: 0; padding: 8px 2px; font-size: 13px; letter-spacing: .05em; white-space: nowrap;
+  color: var(--sub); background: transparent; border: 1px solid var(--line); border-radius: 4px; cursor: pointer;
+}
+.tabs button.on { color: var(--fg); background: #3c1224; border-color: #8a2a40; }
+#arc-body { min-height: 240px; }
+#arc-body .lead { font-size: 12px; color: var(--sub); line-height: 1.6; margin: 0 0 4px; }
+#arc-body .rec-ch { margin-bottom: 4px; }
+#arc-body li .c { display: block; font-size: 12px; color: #e0c49c; margin-top: 3px; line-height: 1.6; }
+#arc-body li.time { position: relative; }
+#arc-body li.time .t { position: absolute; right: 2px; top: 7px; font-size: 16px; letter-spacing: .05em; color: #f0d8c8; font-variant-numeric: tabular-nums; }
+.prof { display: flex; gap: 12px; align-items: flex-start; padding: 10px 2px; border-bottom: 1px solid var(--line); }
+.prof canvas.face { flex: none; image-rendering: pixelated; background: #1a1018; border: 1px solid var(--line); border-radius: 4px; padding: 2px; }
+.prof b { display: block; font-size: 15px; color: #f0d8c8; }
+.prof p { margin: 3px 0 0; font-size: 13px; line-height: 1.7; }
+#arc-body .title-menu { margin: 8px 0 0; }
+#arc-body .tbtn small { display: block; font-size: 12px; letter-spacing: .3em; color: var(--sub); margin-bottom: 2px; }
+#arc-body .tbtn.epi { border-color: #a08050; color: #f4e4c4; }
