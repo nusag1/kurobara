@@ -32,7 +32,7 @@ const ch4Open = () => meta.endings.some(e => /^c3/.test(e));
 const CH_LIST = [[1, '第一章', 'くろばらの館'], [2, '第二章', '魔女の時計塔'], [3, '第三章', 'ソウタの懐中時計'], [4, '第四章', '鏡の向こうの館']];
 const PLAY_CHS = [1, 2, 3, 4];
 const chOpen = ch => ch === 1 || (ch === 2 && ch2Open()) || (ch === 3 && ch3Open()) || (ch === 4 && ch4Open());
-// おまけ（エピローグ・設定資料室）は、四つの章の TRUE END をすべて見ると解放（2026-10-22 社長OK で第四章も）
+// おまけ（エピローグ・設定資料室）は、四つの章の TRUE END をすべて見ると解放（2026-10-22 に第四章も追加）
 const TRUE_IDS = ['true', 'c2true', 'c3true', 'c4true'];
 const trueCount = () => TRUE_IDS.filter(e => meta.endings.includes(e)).length;
 const omakeOpen = () => trueCount() === TRUE_IDS.length;
